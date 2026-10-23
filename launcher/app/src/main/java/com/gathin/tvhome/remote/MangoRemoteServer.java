@@ -58,6 +58,7 @@ public class MangoRemoteServer {
     private final MangoRemoteKeyInjector keyInjector;
     private final ExecutorService connectionPool = Executors.newCachedThreadPool();
     private final Map<String, WebSocketClient> activeClients = new ConcurrentHashMap<>();
+    private final Map<String, Long> processedCommandIds = new ConcurrentHashMap<>();
 
     private ServerSocket serverSocket;
     private volatile boolean isRunning = false;
@@ -529,6 +530,24 @@ public class MangoRemoteServer {
                         err.put("message", "Unauthorized. Valid auth_token or PIN pairing required.");
                         sendText(err.toString());
                         return;
+                    }
+                }
+
+                // Command-level deduplication for network retries and duplicate delivery
+                if (id != null && !id.isEmpty() && !"cmd_ping".equals(id)) {
+                    long now = System.currentTimeMillis();
+                    Long lastSeen = processedCommandIds.get(id);
+                    if (lastSeen != null && (now - lastSeen) < 600) {
+                        JSONObject dupRes = new JSONObject();
+                        dupRes.put("id", id);
+                        dupRes.put("status", "ok");
+                        dupRes.put("deduplicated", true);
+                        sendText(dupRes.toString());
+                        return;
+                    }
+                    processedCommandIds.put(id, now);
+                    if (processedCommandIds.size() > 200) {
+                        processedCommandIds.entrySet().removeIf(e -> (now - e.getValue()) > 5000);
                     }
                 }
 

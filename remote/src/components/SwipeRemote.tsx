@@ -27,109 +27,127 @@ export const SwipeRemote: React.FC<SwipeRemoteProps> = ({ tvState }) => {
   const [touchActive, setTouchActive] = useState(false);
   const [directionActive, setDirectionActive] = useState<string | null>(null);
 
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  // Single active pointer and gesture lifecycle
+  const activePointerIdRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const gestureHandledRef = useRef<boolean>(false);
   const longPressTimerRef = useRef<number | null>(null);
-  const hasSwipedRef = useRef(false);
 
-  const SWIPE_THRESHOLD = 26; // px
+  const SWIPE_THRESHOLD = 28; // px threshold for deliberate swipe classification
+  const TAP_MAX_DISTANCE = 12; // px threshold to distinguish tap from swipe
+  const TAP_MAX_DURATION = 320; // ms maximum for tap detection
 
-  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+  const clearLongPress = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
-    touchStartRef.current = { x: clientX, y: clientY, time: Date.now() };
-    hasSwipedRef.current = false;
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only track primary pointer; ignore secondary multi-touch touches
+    if (activePointerIdRef.current !== null) {
+      return;
+    }
+
+    activePointerIdRef.current = e.pointerId;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    gestureHandledRef.current = false;
     setTouchActive(true);
 
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (_) {}
+
+    clearLongPress();
     longPressTimerRef.current = window.setTimeout(() => {
-      if (!hasSwipedRef.current) {
+      if (!gestureHandledRef.current && activePointerIdRef.current === e.pointerId) {
+        gestureHandledRef.current = true;
         Haptics.longPressStarted();
-        Network.navigate('menu').catch(() => {});
-        hasSwipedRef.current = true;
+        const cmdId = 'longpress_menu_' + Date.now();
+        Network.navigate('menu', cmdId).catch(() => {});
       }
     }, 550);
   };
 
-  const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!touchStartRef.current || hasSwipedRef.current) return;
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== activePointerIdRef.current) return;
+    if (gestureHandledRef.current || !pointerStartRef.current) return;
 
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-
-    const dx = clientX - touchStartRef.current.x;
-    const dy = clientY - touchStartRef.current.y;
+    const dx = e.clientX - pointerStartRef.current.x;
+    const dy = e.clientY - pointerStartRef.current.y;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
 
-    if (Math.max(absX, absY) > 10 && longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
+    if (Math.max(absX, absY) > 8) {
+      clearLongPress();
     }
 
     if (absX >= SWIPE_THRESHOLD || absY >= SWIPE_THRESHOLD) {
-      hasSwipedRef.current = true;
-      if (longPressTimerRef.current) {
-        window.clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
+      // Mark handled immediately before dispatch to guarantee 1:1 delivery
+      gestureHandledRef.current = true;
+      clearLongPress();
 
-      if (absX > absY) {
-        if (dx > 0) {
-          triggerSwipe('right');
-        } else {
-          triggerSwipe('left');
-        }
-      } else {
-        if (dy > 0) {
-          triggerSwipe('down');
-        } else {
-          triggerSwipe('up');
-        }
-      }
+      const direction = absX > absY ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      triggerSwipe(direction);
     }
   };
 
   const triggerSwipe = (direction: 'up' | 'down' | 'left' | 'right') => {
     Haptics.gestureRecognized();
     setDirectionActive(direction);
-    Network.navigate(direction).catch(() => {});
-    window.setTimeout(() => setDirectionActive(null), 200);
+    const cmdId = 'swipe_' + direction + '_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    Network.navigate(direction, cmdId).catch(() => {});
+    window.setTimeout(() => setDirectionActive(null), 180);
   };
 
-  const handleTouchEnd = () => {
-    setTouchActive(false);
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== activePointerIdRef.current) return;
+    clearLongPress();
 
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
+    if (!gestureHandledRef.current && pointerStartRef.current) {
+      const elapsed = Date.now() - pointerStartRef.current.time;
+      const dist = Math.hypot(e.clientX - pointerStartRef.current.x, e.clientY - pointerStartRef.current.y);
 
-    if (touchStartRef.current && !hasSwipedRef.current) {
-      const elapsed = Date.now() - touchStartRef.current.time;
-      if (elapsed < 350) {
-        // Clean tap = OK
+      if (elapsed <= TAP_MAX_DURATION && dist <= TAP_MAX_DISTANCE) {
+        gestureHandledRef.current = true;
         Haptics.buttonPressed();
-        Network.navigate('select').catch(() => {});
+        const cmdId = 'tap_select_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        Network.navigate('select', cmdId).catch(() => {});
       }
     }
 
-    touchStartRef.current = null;
-    hasSwipedRef.current = false;
+    resetPointer(e);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== activePointerIdRef.current) return;
+    clearLongPress();
+    resetPointer(e);
+  };
+
+  const resetPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch (_) {}
+
+    activePointerIdRef.current = null;
+    pointerStartRef.current = null;
+    gestureHandledRef.current = false;
+    setTouchActive(false);
   };
 
   return (
     <div className="swipe-mode-container">
-      {/* Large Capacitive Touch Surface */}
+      {/* Unified Pointer Touch Surface (Zero Dual Event Dispatch) */}
       <div
         className={`touchpad-surface ${touchActive ? 'touch-active' : ''}`}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        onMouseDown={handleTouchStart}
-        onMouseMove={handleTouchMove}
-        onMouseUp={handleTouchEnd}
-        onMouseLeave={handleTouchEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       >
         <div className="touchpad-guide-up" style={{ opacity: directionActive === 'up' ? 1 : 0.25 }}>
           <IconChevronUp size={22} color={directionActive === 'up' ? 'var(--accent-mango)' : 'currentColor'} />

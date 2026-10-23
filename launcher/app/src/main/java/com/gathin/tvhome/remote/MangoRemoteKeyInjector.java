@@ -202,9 +202,13 @@ public class MangoRemoteKeyInjector {
         if (directReceiver != null) {
             mainHandler.post(() -> {
                 if (directReceiver != null) {
-                    directReceiver.onDirectKeyEvent(keyCode);
+                    boolean handled = directReceiver.onDirectKeyEvent(keyCode);
+                    if (!handled) {
+                        keyExecutor.execute(() -> dispatchKeySync(keyCode));
+                    }
                 }
             });
+            return;
         }
 
         keyExecutor.execute(() -> dispatchKeySync(keyCode));

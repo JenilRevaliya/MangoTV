@@ -27,11 +27,11 @@ import java.util.List;
  *
  * Read once in {@link MainActivity#onCreate}; nothing here touches the network.
  */
-final class Config {
+public final class Config {
     private static final String TAG = "TvHome.Config";
     static final String FILE_NAME = "config.json";
     static final String WALLPAPER_NAME = "wallpaper.jpg";
-    static final String SETTINGS_NAME = "launcher_settings";
+    public static final String SETTINGS_NAME = "launcher_settings";
     private static final String THEME_REVISION_NAME = "theme_revision";
     private static final String THEME_SIGNATURE_KEY = "theme_signature";
 
@@ -44,9 +44,9 @@ final class Config {
     final String sourcePanelService;
     final String sourcePanelAction;
     final String inputAction;
-    final int columns;
-    final boolean animations;
-    final boolean advancedEffects;
+    public final int columns;
+    public final boolean animations;
+    public final boolean advancedEffects;
     final int rowsBelowDock;
     final boolean shamsiDate;
     /** Name after the greeting ("Good morning, Mr. Trịnh"); empty for the greeting alone. */
@@ -142,7 +142,7 @@ final class Config {
         return ctx.getExternalFilesDir(null);
     }
 
-    static Config load(Context ctx) {
+    public static Config load(Context ctx) {
         Resources res = ctx.getResources();
         List<String> dock = new ArrayList<>(Arrays.asList(res.getStringArray(R.array.dock_apps)));
         boolean fillDock = res.getBoolean(R.bool.fill_dock);

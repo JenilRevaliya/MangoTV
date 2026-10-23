@@ -88,6 +88,12 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:screenOrientation="landscape" />
+        <activity
+            android:name=".settings.MangoSettingsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.TvHome" />
         <!-- Remote Settings button panel (settings_key_panel); own task so the app behind stays put. -->
         <activity
             android:name=".QuickSettingsActivity"

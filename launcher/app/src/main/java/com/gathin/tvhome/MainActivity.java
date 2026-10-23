@@ -19,6 +19,7 @@ import com.gathin.tvhome.remote.MangoRemoteKeyInjector;
 import com.gathin.tvhome.remote.MangoRemotePairingManager;
 import com.gathin.tvhome.remote.MangoRemoteProtocol;
 import com.gathin.tvhome.remote.MangoRemoteServer;
+import com.gathin.tvhome.settings.MangoSettingsActivity;
 import org.json.JSONObject;
 import android.widget.ProgressBar;
 import java.lang.reflect.Method;
@@ -545,7 +546,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
             return true;
         });
-        btnSettings.setOnClickListener(v -> open(systemIntent(Settings.ACTION_SETTINGS)));
+        btnSettings.setOnClickListener(v -> open(new Intent(this, MangoSettingsActivity.class)));
         btnReorder = findViewById(R.id.btnReorder);
         btnReorder.setOnClickListener(v -> toggleReorder());
         btnReorder.setVisibility(cfg.reorderButton ? View.VISIBLE : View.GONE);

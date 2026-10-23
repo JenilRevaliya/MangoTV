@@ -185,14 +185,14 @@ class NetworkServiceImpl {
     }
   }
 
-  public sendCommand(action: string, payload: Record<string, any> = {}): Promise<RemoteResponse> {
+  public sendCommand(action: string, payload: Record<string, any> = {}, customId?: string): Promise<RemoteResponse> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         reject(new Error('TV Remote is disconnected'));
         return;
       }
 
-      const id = 'cmd_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+      const id = customId || ('cmd_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now());
       const command: RemoteCommand = {
         id,
         type: 'command',
@@ -219,8 +219,8 @@ class NetworkServiceImpl {
   }
 
   // Convenience methods
-  public navigate(direction: 'up' | 'down' | 'left' | 'right' | 'select' | 'back' | 'home' | 'menu') {
-    return this.sendCommand('navigate', { direction });
+  public navigate(direction: 'up' | 'down' | 'left' | 'right' | 'select' | 'back' | 'home' | 'menu', customId?: string) {
+    return this.sendCommand('navigate', { direction }, customId);
   }
 
   public media(mediaAction: 'play_pause' | 'play' | 'pause' | 'fast_forward' | 'rewind' | 'next' | 'previous') {
