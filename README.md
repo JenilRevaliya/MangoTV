@@ -187,34 +187,58 @@ https://github.com/user-attachments/assets/a6a6565f-cac6-4bf0-9164-c97da3fc5f47
 
 ## Mango TV Native Living Room Ecosystem
 
-Mango TV integrates three native living room ecosystem protocols directly into the launcher. Each feature runs with strict dormancy when disabled, consuming zero background memory and zero CPU cycles.
+Mango TV integrates three native living room ecosystem protocols directly into the launcher through a unified, Apple TV-grade system pop-up architecture. Each feature runs with strict dormancy when disabled, consuming zero background memory and zero CPU cycles.
 
-### 1. Mango Share (LocalSend Protocol Receiver)
+### 1. Mango Buds (AirPods Living Room Companion)
+* Reverse-engineered Apple Bluetooth Low Energy (BLE) protocol implementation for AirPods and AirPods Pro.
+* Living room RSSI threshold filter (-75 dBm) ensures detection only occurs within the active viewing area.
+* Manufacturer data parsing extracts verified Left, Right, and Case battery percentages and charging states.
+* Interactive pop-up card featuring high-fidelity vector case artwork, battery status pills, and focus-trapped [ Connect ] and [ Decline ] controls.
+* One-click remote pairing and seamless Bluetooth audio routing directly from the HUD.
+
+### 2. Mango Share (LocalSend Protocol Receiver)
 * Built on the LocalSend v2 open protocol standard for high-speed local network file transfers.
 * Operates UDP multicast discovery on 224.0.0.167:53317 and HTTP transfer listener on port 53317.
 * Compatible with Apple AirDrop-bridge workflows, LocalSend clients on macOS, iOS, Windows, Linux, and Android.
 * Zero-copy streaming pipeline writes directly to disk in fixed 64 KB buffers, completely eliminating Java heap exhaustion on memory-constrained TV hardware.
-* Apple tvOS-style frosted glass HUD with remote D-pad focus-trapped [ Accept ] and [ Decline ] controls.
+* Incoming file preview dialog displaying sender name, filename, file size, and remote D-pad focus-trapped [ Accept ] and [ Decline ] buttons.
+* Real-time transfer progress bar with dynamic byte counters and instant [ Cancel ] option.
 * Complete path traversal sanitization and StatFs storage pre-validation before accepting files.
 
-### 2. Mango AirPlay (Apple Wireless Media Receiver)
-* Native Apple AirPlay and RAOP protocol receiver implementation.
-* Local network mDNS service registration using Android NsdManager for _airplay._tcp and _raop._tcp on port 7000.
-* Instant high-resolution photo projection (POST /photo) with fullscreen rendering and click-to-dismiss.
-* Media streaming and playback controls (POST /play, POST /rate, POST /scrub, POST /stop) dispatched to hardware-accelerated TV players.
-* Liquid glass connection pill displays connected Apple device name and real-time session status with automatic dismissal.
+### 3. Mango Play (Media Discovery and Playback Handoff)
+* Seamless media casting and playback handoff experience ("Continue on Mango TV").
+* Rich 16:9 media artwork preview with source device branding badge.
+* Media duration metadata, media resolution indicator (4K / 1080p), and scrubbed timeline bar.
+* [ Play now ] and [ Not now ] remote-friendly action buttons with direct intent dispatch to TV playback engines.
 
-### 3. Mango Buds (AirPods Living Room Companion)
-* Reverse-engineered Apple Bluetooth Low Energy (BLE) protocol implementation for AirPods and AirPods Pro.
-* Living room RSSI threshold filter (-75 dBm) ensures detection only occurs within the active viewing area.
-* Instant lid-open detection displays liquid glass card with precise Left, Right, and Case battery percentages and active charging indicators.
-* One-click remote pairing and seamless Bluetooth audio routing directly from the HUD.
+### 4. Shared Visual Design System & Overlay Behavior
+* Translucent dark glass card surface (#E6151518) with 26dp rounded corners and 1px subtle border (#33FFFFFF).
+* Non-interactive status pill (#D91C1C1E, 44dp height) docked in the top-right corner for non-intrusive system notifications.
+* Screen-scrim (#66000000) dims background slightly while modal decisions are active without altering underlying layout or destroying focus.
+* Complete D-pad focus management:
+  * Modal auto-focuses primary action button on appearance.
+  * LEFT and RIGHT keys toggle between primary and secondary buttons.
+  * UP and DOWN keys are trapped within the button bar to prevent accidental background tile selection.
+  * BACK button dismisses the prompt without executing actions and restores previous tile focus.
+  * HOME key passes through to system launcher defaults.
+* Priority arbitration engine: Active Transfer (5) > Share Prompt (4) > Play Handoff (3) > Buds Detection (2) > Status Pill (1).
+* Anti-spam protection: 5-minute device cooldown cache for declined requests and a 30-second safe auto-dismiss timeout.
 
-### 4. Low-RAM Architecture and Hardware Benchmarks
+### 5. Remote Control Keymap
+
+| Remote Key | Modal State | Status Pill State | Action / Behavior |
+| :--- | :--- | :--- | :--- |
+| **D-pad Center / OK** | Focused button active | Ignored | Executes focused button action (Connect, Accept, Play now) |
+| **D-pad Left / Right** | Focused button active | Ignored | Toggles focus between Primary and Secondary buttons |
+| **D-pad Up / Down** | Trapped in button bar | Ignored | Retains focus to prevent accidental dismissal or background drift |
+| **Back Button** | Modal visible | Pill visible | Dismisses pop-up safely and restores pre-dialog home focus |
+| **Home Button** | Unintercepted | Unintercepted | Native system launcher pass-through |
+
+### 6. Low-RAM Architecture and Hardware Benchmarks
 * Physical hardware target validation: 1 GB RAM Android TV (32-bit ARM armeabi-v7a, 940 MB total memory, Android 11).
-* Dalvik heap measured live on TV: 2.4 MB.
-* Java heap total measured live on TV: 3.0 MB with all ecosystem services active.
-* APK binary footprint: 2.3 MB minified release package.
+* Dalvik heap measured live on TV: 2.0 MB.
+* Total process PSS measured live on TV: ~3.0 MB with ecosystem services active.
+* APK binary footprint: 2.2 MB minified release package.
 * Strict dormancy: Sockets, BLE scanners, and mDNS listeners close completely when disabled in Mango TV Settings (0 MB RAM, 0% CPU overhead).
 
 ---

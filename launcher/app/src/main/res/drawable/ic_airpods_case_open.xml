@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="72dp"
+    android:viewportWidth="120"
+    android:viewportHeight="72">
+
+    <!-- Lower Case Body (Glossy White, Rounded Capsule) -->
+    <path
+        android:fillColor="#FFF5F5F7"
+        android:pathData="M30,30 C30,26 34,24 40,24 L80,24 C86,24 90,26 90,30 L90,52 C90,62 82,70 70,70 L50,70 C38,70 30,62 30,52 Z" />
+
+    <!-- Lower Case Subtle Shadow Line at Bottom -->
+    <path
+        android:fillColor="#FFE0E0E6"
+        android:pathData="M42,68 L78,68 C74,70 66,70.5 60,70.5 C54,70.5 46,70 42,68 Z" />
+
+    <!-- Open Lid Flap Upper Edge (Drawn Open Upwards) -->
+    <path
+        android:fillColor="#FFE8E8ED"
+        android:pathData="M28,24 C28,14 36,4 48,3 L72,3 C84,4 92,14 92,24 L90,25 C90,16 82,7 72,6 L48,6 C38,7 30,16 30,25 Z" />
+
+    <!-- Interior Cavity Dark Recesses for Earbuds -->
+    <path
+        android:fillColor="#FF2C2C2E"
+        android:pathData="M40,24 C40,20 44,17 48,17 C52,17 56,20 56,24 Z" />
+    <path
+        android:fillColor="#FF2C2C2E"
+        android:pathData="M64,24 C64,20 68,17 72,17 C76,17 80,20 80,24 Z" />
+
+    <!-- Left Earbud Head & Stem Rising from Cavity -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M44,11 C40,11 37,14 37,18 C37,22 40,24 44,24 C48,24 51,21 51,17 C51,13 48,11 44,11 Z" />
+    <!-- Left Earbud Acoustic Mesh Grille -->
+    <path
+        android:fillColor="#FF1C1C1E"
+        android:pathData="M43,14 C41.5,14 40.5,15.2 40.5,16.5 C40.5,17.8 41.5,19 43,19 C44.5,19 45.5,17.8 45.5,16.5 C45.5,15.2 44.5,14 43,14 Z" />
+
+    <!-- Right Earbud Head & Stem Rising from Cavity -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M76,11 C80,11 83,14 83,18 C83,22 80,24 76,24 C72,24 69,21 69,17 C69,13 72,11 76,11 Z" />
+    <!-- Right Earbud Acoustic Mesh Grille -->
+    <path
+        android:fillColor="#FF1C1C1E"
+        android:pathData="M77,14 C78.5,14 79.5,15.2 79.5,16.5 C79.5,17.8 78.5,19 77,19 C75.5,19 74.5,17.8 74.5,16.5 C74.5,15.2 75.5,14 77,14 Z" />
+
+    <!-- Front Case Green Status LED Dot -->
+    <path
+        android:fillColor="#FF34C759"
+        android:pathData="M60,44 m -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0" />
+</vector>

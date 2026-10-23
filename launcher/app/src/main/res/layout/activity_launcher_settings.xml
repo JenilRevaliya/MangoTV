@@ -144,5 +144,47 @@
             android:text="Auto-detect AirPods lid opening nearby with Apple TV-grade battery HUD."
             android:textColor="#FFACB8C1"
             android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/mangoPlayChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="14dp"
+            android:text="Mango Play: On" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Seamless media casting and playback handoff from phones and computers."
+            android:textColor="#FFACB8C1"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/mangoPromptsChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="14dp"
+            android:text="System Pop-ups: Enabled" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Master control for all interactive connectivity overlays and status pills."
+            android:textColor="#FFACB8C1"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/clearCooldownsChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="14dp"
+            android:text="Reset Device Cooldowns" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Clear 5-minute suppression cooldown for previously declined devices."
+            android:textColor="#FFACB8C1"
+            android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

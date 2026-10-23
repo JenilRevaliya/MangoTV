@@ -21,12 +21,17 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView mangoShareChoice;
     private TextView mangoAirPlayChoice;
     private TextView mangoBudsChoice;
+    private TextView mangoPlayChoice;
+    private TextView mangoPromptsChoice;
+    private TextView clearCooldownsChoice;
     private int columns;
     private boolean animations;
     private boolean advancedEffects;
     private boolean mangoShare;
     private boolean mangoAirPlay;
     private boolean mangoBuds;
+    private boolean mangoPlay;
+    private boolean mangoPrompts;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -40,6 +45,8 @@ public final class LauncherSettingsActivity extends Activity {
         mangoShare = choices.getBoolean("mango_share_enabled", true);
         mangoAirPlay = choices.getBoolean("mango_airplay_enabled", true);
         mangoBuds = choices.getBoolean("mango_buds_enabled", true);
+        mangoPlay = choices.getBoolean("mango_play_enabled", true);
+        mangoPrompts = choices.getBoolean("mango_prompts_enabled", true);
 
         int[] ids = {R.id.columns4, R.id.columns5, R.id.columns6, R.id.columns7};
         for (int i = 0; i < ids.length; i++) {
@@ -124,6 +131,29 @@ public final class LauncherSettingsActivity extends Activity {
             refresh();
         });
 
+        mangoPlayChoice = findViewById(R.id.mangoPlayChoice);
+        mangoPlayChoice.setOnClickListener(v -> {
+            mangoPlay = !mangoPlay;
+            choices.edit().putBoolean("mango_play_enabled", mangoPlay).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+
+        mangoPromptsChoice = findViewById(R.id.mangoPromptsChoice);
+        mangoPromptsChoice.setOnClickListener(v -> {
+            mangoPrompts = !mangoPrompts;
+            choices.edit().putBoolean("mango_prompts_enabled", mangoPrompts).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+
+        clearCooldownsChoice = findViewById(R.id.clearCooldownsChoice);
+        clearCooldownsChoice.setOnClickListener(v -> {
+            choices.edit().putLong("cooldowns_cleared_time", System.currentTimeMillis()).apply();
+            Toast.makeText(this, "Device cooldowns reset", Toast.LENGTH_SHORT).show();
+            setResult(RESULT_OK);
+        });
+
         refresh();
         columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
     }
@@ -157,6 +187,14 @@ public final class LauncherSettingsActivity extends Activity {
         if (mangoBudsChoice != null) {
             mangoBudsChoice.setText("Mango Buds: " + (mangoBuds ? getString(R.string.on) : getString(R.string.off)));
             mangoBudsChoice.setSelected(mangoBuds);
+        }
+        if (mangoPlayChoice != null) {
+            mangoPlayChoice.setText("Mango Play: " + (mangoPlay ? getString(R.string.on) : getString(R.string.off)));
+            mangoPlayChoice.setSelected(mangoPlay);
+        }
+        if (mangoPromptsChoice != null) {
+            mangoPromptsChoice.setText("System Pop-ups: " + (mangoPrompts ? "Enabled" : "Disabled"));
+            mangoPromptsChoice.setSelected(mangoPrompts);
         }
     }
 

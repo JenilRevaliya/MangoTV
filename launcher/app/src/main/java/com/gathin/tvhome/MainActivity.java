@@ -13,6 +13,8 @@ import com.gathin.tvhome.bluetooth.AirPodsDetector;
 import com.gathin.tvhome.bluetooth.AirPodsDevice;
 import com.gathin.tvhome.share.MangoShareServer;
 import com.gathin.tvhome.airplay.MangoAirPlayManager;
+import com.gathin.tvhome.connectivity.MangoConnectivityCoordinator;
+import com.gathin.tvhome.connectivity.PlayHandoffRequest;
 import android.widget.ProgressBar;
 import java.lang.reflect.Method;
 import android.content.ActivityNotFoundException;
@@ -138,6 +140,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private ImageView homeWeatherIcon;
     private TextView homeWeatherTemp;
     private final WeatherManager.WeatherListener homeWeatherListener = this::updateHomeWeather;
+
+    // Mango TV Unified Connectivity Coordinator
+    private MangoConnectivityCoordinator connectivityCoordinator;
+    private long lastCooldownsClearedTime = 0L;
 
     // AirPods detection and Apple TV-grade HUD
     private AirPodsDetector airPodsDetector;
@@ -642,6 +648,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                     .build(), vpnCallback);
         }
+        initConnectivityCoordinator();
         initAirPodsViews();
         initShareViews();
         initAirPlayViews();
@@ -650,32 +657,65 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Debug/test receivers for live hardware verification over ADB
         try {
             IntentFilter testFilter = new IntentFilter("com.gathin.tvhome.action.TEST_AIRPODS");
+            testFilter.addAction("com.gathin.tvhome.action.TEST_BUDS");
             testFilter.addAction("com.gathin.tvhome.action.TEST_SHARE");
             testFilter.addAction("com.gathin.tvhome.action.TEST_AIRPLAY");
+            testFilter.addAction("com.gathin.tvhome.action.TEST_PLAY");
+            testFilter.addAction("com.gathin.tvhome.action.TEST_PILL");
             registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     String action = intent.getAction();
-                    if ("com.gathin.tvhome.action.TEST_AIRPODS".equals(action)) {
+                    if ("com.gathin.tvhome.action.TEST_AIRPODS".equals(action) ||
+                            "com.gathin.tvhome.action.TEST_BUDS".equals(action)) {
                         AirPodsDevice mock = new AirPodsDevice("00:11:22:33:44:55");
                         mock.modelName = "AirPods Pro";
                         mock.modelId = 0x0E20;
-                        mock.leftBattery = 85;
-                        mock.rightBattery = 90;
-                        mock.caseBattery = 100;
+                        mock.leftBattery = 92;
+                        mock.rightBattery = 88;
+                        mock.caseBattery = 74;
                         mock.isLeftCharging = false;
-                        mock.isRightCharging = true;
+                        mock.isRightCharging = false;
                         mock.isCaseCharging = false;
                         mock.lidOpen = true;
-                        showAirPodsHud(mock);
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showBudsPrompt(mock);
+                        } else {
+                            showAirPodsHud(mock);
+                        }
                     } else if ("com.gathin.tvhome.action.TEST_SHARE".equals(action)) {
                         MangoShareServer.TransferSession mockSession =
-                                new MangoShareServer.TransferSession("test-123", "MacBook Pro", "macOS", "desktop");
-                        mockSession.addFile(new MangoShareServer.FileItem("f1", "Sample_Video.mp4", 15400000, "video/mp4", "tok1"));
-                        mockSession.addFile(new MangoShareServer.FileItem("f2", "Poster_Image.jpg", 2800000, "image/jpeg", "tok2"));
-                        showShareHud(mockSession);
+                                new MangoShareServer.TransferSession("test-123", "Jenil's iPhone", "iOS", "mobile");
+                        mockSession.addFile(new MangoShareServer.FileItem("f1", "Weekend.jpg", 8808038, "image/jpeg", "tok1"));
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showSharePrompt(mockSession);
+                        } else {
+                            showShareHud(mockSession);
+                        }
                     } else if ("com.gathin.tvhome.action.TEST_AIRPLAY".equals(action)) {
-                        showAirPlayHud("Connected", "Jenil's iPhone");
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showStatusPill("AirPlay", "Jenil's iPhone connected", R.drawable.ic_airplay);
+                        } else {
+                            showAirPlayHud("Connected", "Jenil's iPhone");
+                        }
+                    } else if ("com.gathin.tvhome.action.TEST_PLAY".equals(action)) {
+                        PlayHandoffRequest mockPlay = new PlayHandoffRequest(
+                                "play-test",
+                                "Jenil's iPhone",
+                                "Interstellar",
+                                "2h 49m • 4K",
+                                "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                                4326000L,
+                                10143000L,
+                                null
+                        );
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showPlayHandoffPrompt(mockPlay);
+                        }
+                    } else if ("com.gathin.tvhome.action.TEST_PILL".equals(action)) {
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showStatusPill("Mango Buds", "Tap to connect", R.drawable.ic_airpods);
+                        }
                     }
                 }
             }, testFilter);
@@ -2397,6 +2437,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         }
 
+        // If Unified Mango Connectivity dialog is visible, intercept Back key to safely decline/dismiss
+        if (connectivityCoordinator != null && connectivityCoordinator.isDialogVisible()) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    connectivityCoordinator.handleBackPressed();
+                }
+                return true;
+            }
+        }
+
         // If Mango Share HUD is visible, intercept Back key to cleanly decline/dismiss it
         if (shareHud != null && shareHud.getVisibility() == View.VISIBLE) {
             int code = event.getKeyCode();
@@ -3852,19 +3903,27 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             airPodsDetector.setListener(new AirPodsDetector.Listener() {
                 @Override
                 public void onAirPodsLidOpened(AirPodsDevice device) {
-                    showAirPodsHud(device);
+                    SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+                    if (!prefs.getBoolean("mango_prompts_enabled", true) || !prefs.getBoolean("mango_buds_enabled", true)) return;
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.showBudsPrompt(device);
+                    } else {
+                        showAirPodsHud(device);
+                    }
                 }
 
                 @Override
                 public void onAirPodsStatusUpdated(AirPodsDevice device) {
-                    if (airPodsHud != null && airPodsHud.getVisibility() == View.VISIBLE) {
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.updateBudsStatus(device);
+                    } else if (airPodsHud != null && airPodsHud.getVisibility() == View.VISIBLE) {
                         updateAirPodsHudData(device);
                     }
                 }
 
                 @Override
                 public void onAirPodsLidClosed(AirPodsDevice device) {
-                    dismissAirPodsHud();
+                    // Closed state handled gracefully by timeout
                 }
             });
         } catch (Throwable t) {
@@ -4061,6 +4120,61 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     // ---- Mango TV Ecosystem (Share, AirPlay & Buds) -----------------------------------------------
 
+    private void initConnectivityCoordinator() {
+        View overlayRoot = findViewById(R.id.connectivityOverlayRoot);
+        View statusPill = findViewById(R.id.connectivityStatusPill);
+        if (overlayRoot == null) return;
+
+        connectivityCoordinator = new MangoConnectivityCoordinator(this, overlayRoot, statusPill);
+        connectivityCoordinator.setListener(new MangoConnectivityCoordinator.Listener() {
+            @Override
+            public void onConnectBuds(AirPodsDevice device) {
+                connectAirPods(device);
+            }
+
+            @Override
+            public void onDeclineBuds(AirPodsDevice device) {
+                Log.d("MainActivity", "Declined AirPods connection: " + device.modelName);
+            }
+
+            @Override
+            public void onAcceptShare(MangoShareServer.TransferSession session) {
+                if (session != null) session.accept();
+            }
+
+            @Override
+            public void onDeclineShare(MangoShareServer.TransferSession session) {
+                if (session != null) session.decline();
+            }
+
+            @Override
+            public void onCancelShare(MangoShareServer.TransferSession session) {
+                if (session != null) session.decline();
+            }
+
+            @Override
+            public void onPlayHandoffConfirmed(PlayHandoffRequest request) {
+                if (request != null && request.streamUrl != null) {
+                    playMediaStream(request.streamUrl, request.positionMs);
+                }
+            }
+
+            @Override
+            public void onPlayHandoffDismissed(PlayHandoffRequest request) {
+                Log.d("MainActivity", "Media handoff dismissed: " + request.title);
+            }
+
+            @Override
+            public void playNavSound() {
+                playAppleClickSound();
+            }
+        });
+    }
+
+    private void playMediaStream(String videoUrl, long startPositionMs) {
+        playAirPlayVideo(videoUrl, startPositionMs / 1000f);
+    }
+
     private void initShareViews() {
         shareHud = findViewById(R.id.shareHud);
         if (shareHud == null) return;
@@ -4118,6 +4232,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void refreshMangoEcosystem() {
         SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+        long clearedTime = prefs.getLong("cooldowns_cleared_time", 0L);
+        if (clearedTime > lastCooldownsClearedTime) {
+            lastCooldownsClearedTime = clearedTime;
+            if (connectivityCoordinator != null) connectivityCoordinator.clearCooldowns();
+        }
+
         boolean shareEnabled = prefs.getBoolean("mango_share_enabled", true);
         if (shareEnabled && mangoShareServer == null) {
             startMangoShare();
@@ -4151,12 +4271,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mangoShareServer.setListener(new MangoShareServer.Listener() {
                 @Override
                 public void onIncomingTransferRequested(MangoShareServer.TransferSession session) {
-                    showShareHud(session);
+                    SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+                    if (!prefs.getBoolean("mango_prompts_enabled", true) || !prefs.getBoolean("mango_share_enabled", true)) {
+                        session.decline();
+                        return;
+                    }
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.showSharePrompt(session);
+                    } else {
+                        showShareHud(session);
+                    }
                 }
 
                 @Override
                 public void onTransferProgress(MangoShareServer.TransferSession session, MangoShareServer.FileItem item, long bytesReceived, long totalBytes) {
-                    if (shareProgressBar != null && totalBytes > 0) {
+                    if (connectivityCoordinator != null && totalBytes > 0) {
+                        int percent = (int) ((bytesReceived * 100) / totalBytes);
+                        connectivityCoordinator.updateShareProgress(percent, bytesReceived, totalBytes);
+                    } else if (shareProgressBar != null && totalBytes > 0) {
                         int progress = (int) ((bytesReceived * 100) / totalBytes);
                         shareProgressBar.setProgress(progress);
                     }
@@ -4167,29 +4299,37 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
                 @Override
                 public void onTransferComplete(MangoShareServer.TransferSession session) {
-                    if (shareHudStatus != null) {
-                        shareHudStatus.setText("Transfer Complete");
-                        shareHudStatus.setTextColor(0xFF34C759);
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.onShareComplete();
+                    } else {
+                        if (shareHudStatus != null) {
+                            shareHudStatus.setText("Transfer Complete");
+                            shareHudStatus.setTextColor(0xFF34C759);
+                        }
+                        if (shareSenderDetails != null) {
+                            shareSenderDetails.setText("Saved " + session.files.size() + " files to Downloads/MangoShare");
+                        }
+                        if (shareProgressBar != null) {
+                            shareProgressBar.setProgress(100);
+                        }
+                        handler.postDelayed(MainActivity.this::dismissShareHud, 3500L);
                     }
-                    if (shareSenderDetails != null) {
-                        shareSenderDetails.setText("Saved " + session.files.size() + " files to Downloads/MangoShare");
-                    }
-                    if (shareProgressBar != null) {
-                        shareProgressBar.setProgress(100);
-                    }
-                    handler.postDelayed(MainActivity.this::dismissShareHud, 3500L);
                 }
 
                 @Override
                 public void onTransferError(MangoShareServer.TransferSession session, String reason) {
-                    if (shareHudStatus != null) {
-                        shareHudStatus.setText("Transfer Failed");
-                        shareHudStatus.setTextColor(0xFFFF3B30);
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.dismissDialog();
+                    } else {
+                        if (shareHudStatus != null) {
+                            shareHudStatus.setText("Transfer Failed");
+                            shareHudStatus.setTextColor(0xFFFF3B30);
+                        }
+                        if (shareSenderDetails != null) {
+                            shareSenderDetails.setText(reason);
+                        }
+                        handler.postDelayed(MainActivity.this::dismissShareHud, 2500L);
                     }
-                    if (shareSenderDetails != null) {
-                        shareSenderDetails.setText(reason);
-                    }
-                    handler.postDelayed(MainActivity.this::dismissShareHud, 2500L);
                 }
             });
             mangoShareServer.start();
@@ -4309,7 +4449,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mangoAirPlayManager.setListener(new MangoAirPlayManager.Listener() {
                 @Override
                 public void onAirPlayClientConnected(String clientIp, String deviceName) {
-                    showAirPlayHud("Connected", deviceName);
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.showStatusPill("AirPlay", deviceName + " connected", R.drawable.ic_airplay);
+                    } else {
+                        showAirPlayHud("Connected", deviceName);
+                    }
                 }
 
                 @Override
@@ -4319,7 +4463,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
                 @Override
                 public void onVideoPlayRequested(String videoUrl, float startPosition) {
-                    playAirPlayVideo(videoUrl, startPosition);
+                    SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+                    if (!prefs.getBoolean("mango_play_enabled", true) || !prefs.getBoolean("mango_prompts_enabled", true)) {
+                        playAirPlayVideo(videoUrl, startPosition);
+                        return;
+                    }
+                    if (connectivityCoordinator != null) {
+                        PlayHandoffRequest req = new PlayHandoffRequest(
+                                "airplay-" + System.currentTimeMillis(),
+                                "Apple Device",
+                                "AirPlay Video",
+                                "Streaming Video • 1080p",
+                                videoUrl,
+                                (long) (startPosition * 1000),
+                                0,
+                                null
+                        );
+                        connectivityCoordinator.showPlayHandoffPrompt(req);
+                    } else {
+                        playAirPlayVideo(videoUrl, startPosition);
+                    }
                 }
 
                 @Override
@@ -4330,7 +4493,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
                 @Override
                 public void onAirPlayStopped() {
-                    dismissAirPlayHud();
+                    if (connectivityCoordinator != null) {
+                        connectivityCoordinator.dismissDialog();
+                        connectivityCoordinator.dismissStatusPill();
+                    } else {
+                        dismissAirPlayHud();
+                    }
                     if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
                 }
             });

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="10dp"
+    android:viewportWidth="16"
+    android:viewportHeight="10">
+    <!-- Battery Outer Shell -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF34C759"
+        android:strokeWidth="1.2"
+        android:pathData="M1.5,1.5 L12.5,1.5 C13,1.5 13.5,2 13.5,2.5 L13.5,7.5 C13.5,8 13,8.5 12.5,8.5 L1.5,8.5 C1,8.5 0.5,8 0.5,7.5 L0.5,2.5 C0.5,2 1,1.5 1.5,1.5 Z" />
+    <!-- Positive Terminal Nub -->
+    <path
+        android:fillColor="#FF34C759"
+        android:pathData="M14.5,3.5 L15,3.5 C15.5,3.5 15.5,6.5 15,6.5 L14.5,6.5 Z" />
+    <!-- Filled Level (Green) -->
+    <path
+        android:fillColor="#FF34C759"
+        android:pathData="M2,2.5 L10.5,2.5 C10.8,2.5 11,2.7 11,3 L11,7 C11,7.3 10.8,7.5 10.5,7.5 L2,7.5 C1.7,7.5 1.5,7.3 1.5,7 L1.5,3 C1.5,2.7 1.7,2.5 2,2.5 Z" />
+</vector>

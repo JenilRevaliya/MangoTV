@@ -454,14 +454,11 @@
         android:elevation="15dp"
         android:importantForAccessibility="no" />
 
-    <!-- Apple TV-style AirPods HUD card overlay -->
-    <include layout="@layout/view_airpods_hud" />
+    <!-- Unified Mango TV Connectivity Pop-up Dialog Overlay -->
+    <include layout="@layout/view_connectivity_dialog" />
 
-    <!-- Mango Share incoming transfer HUD overlay -->
-    <include layout="@layout/view_share_hud" />
-
-    <!-- Mango AirPlay status HUD overlay -->
-    <include layout="@layout/view_airplay_hud" />
+    <!-- Mango TV Connectivity Top-Right Status Pill -->
+    <include layout="@layout/view_connectivity_pill" />
 
     <!-- Fullscreen AirPlay photo receiver overlay -->
     <ImageView
