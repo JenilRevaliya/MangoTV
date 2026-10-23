@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple-system grey pill for Mac Dock row (#E6242426 with subtle glass rim).
+     Concentric corner rule: inner card radius 16dp + 10dp padding = 26dp outer radius. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#E6242426" />
+    <stroke
+        android:width="1.5dp"
+        android:color="#2EFFFFFF" />
+    <corners android:radius="26dp" />
+</shape>

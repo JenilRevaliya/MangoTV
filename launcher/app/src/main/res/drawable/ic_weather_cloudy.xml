@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Minimalist Apple-style cloud (cloud.fill) -->
+    <path
+        android:fillColor="#E6F2F5F8"
+        android:pathData="M18.8,11.2 C18.3,8.3 15.8,6.1 12.8,6.1 C10.4,6.1 8.3,7.5 7.3,9.5 C4.9,9.8 3.0,11.9 3.0,14.4 C3.0,17.1 5.2,19.3 7.9,19.3 L18.6,19.3 C20.9,19.3 22.8,17.4 22.8,15.1 C22.8,13.0 21.2,11.4 18.8,11.2 Z" />
+</vector>

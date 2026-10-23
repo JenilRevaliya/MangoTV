@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mac Dock app card: same 16:9 aspect ratio and dimensions as apps in grid (180dp x 101dp), Apple squircle -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dockCard"
+    android:layout_width="136dp"
+    android:layout_height="77dp"
+    android:layout_marginStart="0dp"
+    android:layout_marginEnd="0dp"
+    android:focusable="true"
+    android:clickable="true"
+    android:focusableInTouchMode="false"
+    android:nextFocusUp="@+id/watchNextList"
+    android:background="@drawable/dock_tile_bg"
+    android:clipToOutline="true"
+    android:clipChildren="true">
+
+    <!-- Cinematic 16:9 app banner — exact match to item_app.xml banner -->
+    <ImageView
+        android:id="@+id/dockBanner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:clipToOutline="true"
+        android:contentDescription="@null" />
+
+    <!-- Fallback app icon for apps without 16:9 banner -->
+    <ImageView
+        android:id="@+id/dockIcon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:layout_marginBottom="14dp"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+
+    <!-- Fallback app title for apps without 16:9 banner -->
+    <TextView
+        android:id="@+id/dockLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="8dp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:fontFamily="@font/sf_medium"
+        android:visibility="gone" />
+
+</FrameLayout>

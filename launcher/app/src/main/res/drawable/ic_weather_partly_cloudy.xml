@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Minimalist Apple-style sun behind cloud (cloud.sun.fill) -->
+    <!-- Sun disk -->
+    <path
+        android:fillColor="#FFFFD60A"
+        android:pathData="M16.5,9.5m-3.2,0a3.2,3.2 0,1 1,6.4 0a3.2,3.2 0,1 1,-6.4 0" />
+    <!-- Sun rays -->
+    <path
+        android:strokeColor="#FFFFD60A"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M16.5,3.2 L16.5,4.8 M22.8,9.5 L21.2,9.5 M21.0,5.0 L19.8,6.2 M12.0,5.0 L13.2,6.2" />
+    <!-- Apple Cloud in foreground -->
+    <path
+        android:fillColor="#E6F2F5F8"
+        android:pathData="M16.8,12.8 C16.4,10.7 14.5,9.0 12.2,9.0 C10.3,9.0 8.7,10.1 7.9,11.6 C6.0,11.8 4.5,13.4 4.5,15.4 C4.5,17.5 6.2,19.3 8.3,19.3 L16.6,19.3 C18.5,19.3 20.0,17.8 20.0,16.0 C20.0,14.3 18.7,13.0 16.8,12.8 Z" />
+</vector>

@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF000000">
+
+    <!-- Dual-layer ultra-smooth crossfading wallpaper engine (Apple tvOS style) -->
+    <ImageView
+        android:id="@+id/wallpaperA"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no" />
+
+    <ImageView
+        android:id="@+id/wallpaperB"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no" />
+
+    <!-- Apple-grade frosted blur layer: fades in smoothly when dock is hidden (apps grid) -->
+    <ImageView
+        android:id="@+id/wallpaperBlurOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no" />
+
+    <!-- Subtle cinematic dark scrim for Apple-grade contrast and typography readability -->
+    <View
+        android:id="@+id/wallpaperDim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#20000000"
+        android:importantForAccessibility="no" />
+
+    <!-- Time-of-day backdrop, drawn once a minute (config.xml sky_intensity; 0 keeps it hidden). -->
+    <com.gathin.tvhome.SkyView
+        android:id="@+id/sky"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no" />
+
+    <!-- Top shelf: heroName hidden in favor of direct app labels and section headers -->
+    <TextView
+        android:id="@+id/heroName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="68dp"
+        android:alpha="0"
+        android:visibility="gone"
+        android:textColor="#FFFFFFFF"
+        android:textSize="36sp"
+        android:fontFamily="@font/sf_bold"
+        android:letterSpacing="-0.02"
+        android:includeFontPadding="false"
+        android:singleLine="true" />
+
+    <!-- Row 3 in Stage 0: Continue Watching Section (Drawn above appsContainer, slides under headerLayer) -->
+    <LinearLayout
+        android:id="@+id/watchNextSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="56dp"
+        android:paddingEnd="56dp"
+        android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <TextView
+            android:id="@+id/watchNextHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="4dp"
+            android:text="CONTINUE WATCHING"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp"
+            android:fontFamily="@font/sf_bold"
+            android:letterSpacing="0.08"
+            android:textAllCaps="true"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/watchNextList"
+            android:layout_width="match_parent"
+            android:layout_height="124dp"
+            android:clipToPadding="false"
+            android:clipChildren="false"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:focusable="false"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusUp="@+id/btnWifi" />
+    </LinearLayout>
+
+    <!-- Apps Grid Container: match_parent so it renders and scrolls all rows without clipping -->
+    <LinearLayout
+        android:id="@+id/appsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingStart="56dp"
+        android:paddingEnd="56dp"
+        android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:visibility="gone">
+
+        <!-- Apps section title: hidden by default, only shown in Stage 1+ (Apps grid) -->
+        <TextView
+            android:id="@+id/appsHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="4dp"
+            android:text="APPS"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp"
+            android:fontFamily="@font/sf_bold"
+            android:letterSpacing="0.08"
+            android:textAllCaps="true"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="4"
+            android:visibility="gone" />
+
+        <!-- The apps grid -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingTop="2dp"
+            android:paddingBottom="240dp"
+            android:clipToPadding="false"
+            android:clipChildren="false"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:focusable="false"
+            android:descendantFocusability="afterDescendants" />
+    </LinearLayout>
+
+    <!-- Mac Dock Row (Row 4): Apple-grey pill holding 4 priority apps.
+         Fully inside the screen in Stage 0/0.5 at Row 4.
+         clipChildren=false so Mac Dock zoom can exit container from the top. -->
+    <FrameLayout
+        android:id="@+id/dockContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:paddingStart="56dp"
+        android:paddingEnd="56dp"
+        android:paddingTop="30dp"
+        android:paddingBottom="10dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <!-- Dynamic expanding Apple-grey rounded pill background -->
+        <View
+            android:id="@+id/dockPillBg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:background="@drawable/dock_pill_bg" />
+
+        <!-- The inner pill holding app icons (transparent background, draws above dockPillBg) -->
+        <LinearLayout
+            android:id="@+id/dockPill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:clipChildren="false"
+            android:clipToPadding="false" />
+
+    </FrameLayout>
+
+    <!-- Header Layer (Rows 1 & 2): Drawn ON TOP of contentContainer so CW slides underneath -->
+    <RelativeLayout
+        android:id="@+id/headerLayer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="56dp"
+        android:paddingEnd="56dp"
+        android:paddingTop="26dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="10dp">
+
+        <LinearLayout
+            android:id="@+id/leftBlock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@+id/topButtons"
+            android:layout_marginEnd="16dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="vertical">
+
+            <!-- Greeting (optional, subtle above date) -->
+            <TextView
+                android:id="@+id/greeting"
+                android:gravity="left"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp"
+                android:fontFamily="@font/sf_medium"
+                android:letterSpacing="0.18"
+                android:textAllCaps="true"
+                android:shadowColor="#80000000"
+                android:shadowDx="0"
+                android:shadowDy="2"
+                android:shadowRadius="4"
+                android:visibility="gone" />
+
+            <!-- Date, Day & Live Weather (Apple iOS 16 & tvOS style) -->
+            <LinearLayout
+                android:id="@+id/dateWeatherRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextClock
+                    android:id="@+id/date"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:format12Hour="EEEE, d MMMM"
+                    android:format24Hour="EEEE, d MMMM"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="15sp"
+                    android:fontFamily="@font/sf_medium"
+                    android:letterSpacing="0.06"
+                    android:textAllCaps="true"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="6" />
+
+                <TextView
+                    android:id="@+id/dateWeatherDot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:text="|"
+                    android:textColor="#59FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="@font/sf_regular"
+                    android:includeFontPadding="false"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="6" />
+
+                <ImageView
+                    android:id="@+id/homeWeatherIcon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginEnd="6dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_weather_sun"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/homeWeatherTemp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="30°"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="15sp"
+                    android:fontFamily="@font/sf_medium"
+                    android:letterSpacing="0.04"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="6" />
+            </LinearLayout>
+
+            <!-- Shamsi date (optional) -->
+            <TextView
+                android:id="@+id/shamsiDate"
+                android:gravity="left"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="#E6FFFFFF"
+                android:textSize="15sp"
+                android:fontFamily="@font/sf_regular"
+                android:letterSpacing="0.02"
+                android:includeFontPadding="false"
+                android:visibility="gone" />
+
+            <!-- Massive & Thick iPhone-style Clock Container (scales smoothly into Row 1) -->
+            <LinearLayout
+                android:id="@+id/clockContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-4dp"
+                android:orientation="horizontal"
+                android:baselineAligned="true"
+                android:transformPivotX="0dp"
+                android:transformPivotY="0dp">
+
+                <TextClock
+                    android:id="@+id/clock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:format12Hour="h:mm"
+                    android:format24Hour="HH:mm"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="124sp"
+                    android:fontFamily="@font/sf_heavy"
+                    android:letterSpacing="-0.035"
+                    android:includeFontPadding="false"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="4"
+                    android:shadowRadius="18" />
+
+                <TextClock
+                    android:id="@+id/ampm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_gravity="bottom"
+                    android:layout_marginBottom="16dp"
+                    android:format12Hour="a"
+                    android:format24Hour=""
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="18sp"
+                    android:fontFamily="@font/sf_bold"
+                    android:letterSpacing="0.04"
+                    android:textAllCaps="true"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="2"
+                    android:shadowRadius="6" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Memory / CPU / Storage Stats: Gone as requested -->
+        <TextView
+            android:id="@+id/stats"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:focusable="false"
+            android:visibility="gone" />
+
+        <!-- Apple Liquid Glass Status Pills (Order: MangoTV Logo -> Wi-Fi -> Settings -> Inputs) -->
+        <LinearLayout
+            android:id="@+id/topButtons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="-2dp"
+            android:gravity="center_vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="horizontal">
+
+            <!-- System Branding: MangoTV Logo -->
+            <ImageView
+                android:id="@+id/logoMangoTv"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="16dp"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:src="@drawable/logo_mangotv"
+                android:contentDescription="MangoTV"
+                android:focusable="false"
+                android:clickable="false"
+                android:alpha="0.92" />
+
+            <!-- 1. Wi-Fi / Network pill first -->
+            <TextView
+                android:id="@+id/btnWifi"
+                style="@style/TopButton"
+                android:maxWidth="180dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:text="@string/wifi"
+                android:drawableStart="@drawable/ic_wifi"
+                android:nextFocusLeft="@+id/btnWifi"
+                android:nextFocusRight="@+id/btnSettings"
+                android:nextFocusDown="@+id/watchNextList" />
+
+            <!-- 2. Settings pill second -->
+            <TextView
+                android:id="@+id/btnSettings"
+                style="@style/TopButton"
+                android:text="@string/settings"
+                android:drawableStart="@drawable/ic_settings"
+                android:nextFocusLeft="@+id/btnWifi"
+                android:nextFocusRight="@+id/btnInputs"
+                android:nextFocusDown="@+id/watchNextList" />
+
+            <!-- 3. Inputs pill third -->
+            <TextView
+                android:id="@+id/btnInputs"
+                style="@style/TopButton"
+                android:text="@string/inputs"
+                android:drawableStart="@drawable/ic_input"
+                android:nextFocusLeft="@+id/btnSettings"
+                android:nextFocusRight="@+id/btnReorder"
+                android:nextFocusDown="@+id/watchNextList" />
+
+            <!-- 4. Reorder icon (compact) -->
+            <TextView
+                android:id="@+id/btnReorder"
+                style="@style/TopButtonIcon"
+                android:contentDescription="@string/reorder"
+                android:drawableStart="@drawable/ic_swap_vert"
+                android:nextFocusLeft="@+id/btnInputs"
+                android:nextFocusRight="@+id/btnReorder"
+                android:nextFocusDown="@+id/watchNextList" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Dynamic subtle bottom edge vignette (active when cards are present on Row 4) -->
+    <View
+        android:id="@+id/bottomVignette"
+        android:layout_width="match_parent"
+        android:layout_height="140dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/vignette_bottom"
+        android:alpha="0"
+        android:elevation="15dp"
+        android:importantForAccessibility="no" />
+
+    <!-- The single floating glass highlight that springs between tiles. -->
+    <com.gathin.tvhome.GlassView
+        android:id="@+id/glass"
+        android:layout_width="10dp"
+        android:layout_height="10dp"
+        android:alpha="0"
+        android:elevation="30dp"
+        android:importantForAccessibility="no" />
+</FrameLayout>
