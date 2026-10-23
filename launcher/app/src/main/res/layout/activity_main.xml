@@ -457,6 +457,22 @@
     <!-- Apple TV-style AirPods HUD card overlay -->
     <include layout="@layout/view_airpods_hud" />
 
+    <!-- Mango Share incoming transfer HUD overlay -->
+    <include layout="@layout/view_share_hud" />
+
+    <!-- Mango AirPlay status HUD overlay -->
+    <include layout="@layout/view_airplay_hud" />
+
+    <!-- Fullscreen AirPlay photo receiver overlay -->
+    <ImageView
+        android:id="@+id/airPlayPhotoView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF000000"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:elevation="35dp" />
+
     <!-- The single floating glass highlight that springs between tiles. -->
     <com.gathin.tvhome.GlassView
         android:id="@+id/glass"

@@ -11,6 +11,9 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import com.gathin.tvhome.bluetooth.AirPodsDetector;
 import com.gathin.tvhome.bluetooth.AirPodsDevice;
+import com.gathin.tvhome.share.MangoShareServer;
+import com.gathin.tvhome.airplay.MangoAirPlayManager;
+import android.widget.ProgressBar;
 import java.lang.reflect.Method;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -19,6 +22,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.database.ContentObserver;
@@ -154,6 +158,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private View focusedAirPodsButton;
     private View preAirPodsFocusedView;
     private Runnable airPodsAutoDismissRunnable;
+
+    // Mango Share
+    private MangoShareServer mangoShareServer;
+    private MangoShareServer.TransferSession currentShareSession;
+    private View shareHud;
+    private TextView shareHudTitle;
+    private TextView shareHudStatus;
+    private TextView shareSenderDetails;
+    private ProgressBar shareProgressBar;
+    private View shareButtonsRow;
+    private TextView btnShareAccept;
+    private TextView btnShareDecline;
+    private View focusedShareButton;
+    private View preShareFocusedView;
+    private Runnable shareAutoDismissRunnable;
+
+    // Mango AirPlay
+    private MangoAirPlayManager mangoAirPlayManager;
+    private View airPlayHud;
+    private TextView airPlayHudTitle;
+    private TextView airPlayHudStatus;
+    private ImageView airPlayPhotoView;
+    private Runnable airPlayAutoDismissRunnable;
 
     private int heldNavKeyCode = 0;
     private long navHoldStartTime = 0L;
@@ -571,10 +598,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (grid != null && isDescendantOf(newF, grid)) return;
             if (dockPill != null && isDescendantOf(newF, dockPill)) return;
             if (airPodsHud != null && isDescendantOf(newF, airPodsHud)) return;
+            if (shareHud != null && isDescendantOf(newF, shareHud)) return;
             // Focus truly left tiles: clear tracking and fade the glass
             focusedWatchNextCard = null;
             lastFocusedTileCard = null;
             focusedAirPodsButton = null;
+            focusedShareButton = null;
             hideGlass();
         });
 
@@ -614,25 +643,40 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .build(), vpnCallback);
         }
         initAirPodsViews();
-        initAirPodsDetector();
+        initShareViews();
+        initAirPlayViews();
+        initMangoEcosystem();
 
-        // Debug/test receiver for live hardware verification over ADB
+        // Debug/test receivers for live hardware verification over ADB
         try {
             IntentFilter testFilter = new IntentFilter("com.gathin.tvhome.action.TEST_AIRPODS");
+            testFilter.addAction("com.gathin.tvhome.action.TEST_SHARE");
+            testFilter.addAction("com.gathin.tvhome.action.TEST_AIRPLAY");
             registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    AirPodsDevice mock = new AirPodsDevice("00:11:22:33:44:55");
-                    mock.modelName = "AirPods Pro";
-                    mock.modelId = 0x0E20;
-                    mock.leftBattery = 85;
-                    mock.rightBattery = 90;
-                    mock.caseBattery = 100;
-                    mock.isLeftCharging = false;
-                    mock.isRightCharging = true;
-                    mock.isCaseCharging = false;
-                    mock.lidOpen = true;
-                    showAirPodsHud(mock);
+                    String action = intent.getAction();
+                    if ("com.gathin.tvhome.action.TEST_AIRPODS".equals(action)) {
+                        AirPodsDevice mock = new AirPodsDevice("00:11:22:33:44:55");
+                        mock.modelName = "AirPods Pro";
+                        mock.modelId = 0x0E20;
+                        mock.leftBattery = 85;
+                        mock.rightBattery = 90;
+                        mock.caseBattery = 100;
+                        mock.isLeftCharging = false;
+                        mock.isRightCharging = true;
+                        mock.isCaseCharging = false;
+                        mock.lidOpen = true;
+                        showAirPodsHud(mock);
+                    } else if ("com.gathin.tvhome.action.TEST_SHARE".equals(action)) {
+                        MangoShareServer.TransferSession mockSession =
+                                new MangoShareServer.TransferSession("test-123", "MacBook Pro", "macOS", "desktop");
+                        mockSession.addFile(new MangoShareServer.FileItem("f1", "Sample_Video.mp4", 15400000, "video/mp4", "tok1"));
+                        mockSession.addFile(new MangoShareServer.FileItem("f2", "Poster_Image.jpg", 2800000, "image/jpeg", "tok2"));
+                        showShareHud(mockSession);
+                    } else if ("com.gathin.tvhome.action.TEST_AIRPLAY".equals(action)) {
+                        showAirPlayHud("Connected", "Jenil's iPhone");
+                    }
                 }
             }, testFilter);
         } catch (Throwable ignored) {}
@@ -1104,6 +1148,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             updateTileGlass(lastFocusedTileCard, lastFocused, spring);
         } else if (focusedAirPodsButton != null && focusedAirPodsButton.isAttachedToWindow() && focusedAirPodsButton.isFocused()) {
             updateAirPodsButtonGlass(focusedAirPodsButton, spring);
+        } else if (focusedShareButton != null && focusedShareButton.isAttachedToWindow() && focusedShareButton.isFocused()) {
+            updateShareButtonGlass(focusedShareButton, spring);
         } else {
             hideGlass();
         }
@@ -1994,9 +2040,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         promptsPaused = false;
-        if (airPodsDetector != null) {
-            airPodsDetector.startScanning();
-        }
+        refreshMangoEcosystem();
         if (rebuildOnResume) {
             tilesReady = false;
             reloadApps(true);
@@ -2128,6 +2172,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             airPodsDetector.stopScanning();
         }
         dismissAirPodsHud();
+        dismissShareHud();
+        dismissAirPlayHud();
     }
 
     @Override
@@ -2152,6 +2198,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (airPodsDetector != null) {
             airPodsDetector.destroy();
             airPodsDetector = null;
+        }
+        if (mangoShareServer != null) {
+            mangoShareServer.stop();
+            mangoShareServer = null;
+        }
+        if (mangoAirPlayManager != null) {
+            mangoAirPlayManager.stop();
+            mangoAirPlayManager = null;
         }
         if (soundPool != null) {
             soundPool.release();
@@ -2330,6 +2384,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return true;
             }
             return super.dispatchKeyEvent(event);
+        }
+
+        // If AirPlay Photo is visible, intercept Back key to close photo
+        if (airPlayPhotoView != null && airPlayPhotoView.getVisibility() == View.VISIBLE) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    airPlayPhotoView.setVisibility(View.GONE);
+                }
+                return true;
+            }
+        }
+
+        // If Mango Share HUD is visible, intercept Back key to cleanly decline/dismiss it
+        if (shareHud != null && shareHud.getVisibility() == View.VISIBLE) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    if (currentShareSession != null && !currentShareSession.isFinished) {
+                        currentShareSession.decline();
+                    }
+                    dismissShareHud();
+                }
+                return true;
+            }
         }
 
         // If AirPods HUD is visible, intercept Back key to cleanly dismiss it
@@ -3978,5 +4057,371 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             dismissAirPodsHud();
         }
+    }
+
+    // ---- Mango TV Ecosystem (Share, AirPlay & Buds) -----------------------------------------------
+
+    private void initShareViews() {
+        shareHud = findViewById(R.id.shareHud);
+        if (shareHud == null) return;
+        shareHudTitle = findViewById(R.id.shareHudTitle);
+        shareHudStatus = findViewById(R.id.shareHudStatus);
+        shareSenderDetails = findViewById(R.id.shareSenderDetails);
+        shareProgressBar = findViewById(R.id.shareProgressBar);
+        shareButtonsRow = findViewById(R.id.shareButtonsRow);
+        btnShareAccept = findViewById(R.id.btnShareAccept);
+        btnShareDecline = findViewById(R.id.btnShareDecline);
+
+        View.OnFocusChangeListener focusListener = (v, focused) -> {
+            if (focused) updateShareButtonGlass(v, true);
+        };
+
+        if (btnShareAccept != null) {
+            btnShareAccept.setOnFocusChangeListener(focusListener);
+            btnShareAccept.setOnClickListener(v -> {
+                if (currentShareSession != null) {
+                    currentShareSession.accept();
+                    if (shareButtonsRow != null) shareButtonsRow.setVisibility(View.GONE);
+                    if (shareProgressBar != null) {
+                        shareProgressBar.setVisibility(View.VISIBLE);
+                        shareProgressBar.setProgress(0);
+                    }
+                    if (shareHudStatus != null) shareHudStatus.setText("Receiving Files...");
+                    hideGlass();
+                }
+            });
+        }
+        if (btnShareDecline != null) {
+            btnShareDecline.setOnFocusChangeListener(focusListener);
+            btnShareDecline.setOnClickListener(v -> {
+                if (currentShareSession != null) {
+                    currentShareSession.decline();
+                }
+                dismissShareHud();
+            });
+        }
+    }
+
+    private void initAirPlayViews() {
+        airPlayHud = findViewById(R.id.airPlayHud);
+        airPlayHudTitle = findViewById(R.id.airPlayHudTitle);
+        airPlayHudStatus = findViewById(R.id.airPlayHudStatus);
+        airPlayPhotoView = findViewById(R.id.airPlayPhotoView);
+        if (airPlayPhotoView != null) {
+            airPlayPhotoView.setOnClickListener(v -> airPlayPhotoView.setVisibility(View.GONE));
+        }
+    }
+
+    private void initMangoEcosystem() {
+        refreshMangoEcosystem();
+    }
+
+    private void refreshMangoEcosystem() {
+        SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+        boolean shareEnabled = prefs.getBoolean("mango_share_enabled", true);
+        if (shareEnabled && mangoShareServer == null) {
+            startMangoShare();
+        } else if (!shareEnabled && mangoShareServer != null) {
+            stopMangoShare();
+        }
+
+        boolean airPlayEnabled = prefs.getBoolean("mango_airplay_enabled", true);
+        if (airPlayEnabled && mangoAirPlayManager == null) {
+            startMangoAirPlay();
+        } else if (!airPlayEnabled && mangoAirPlayManager != null) {
+            stopMangoAirPlay();
+        }
+
+        boolean budsEnabled = prefs.getBoolean("mango_buds_enabled", true);
+        if (budsEnabled && airPodsDetector == null) {
+            initAirPodsDetector();
+            if (airPodsDetector != null) airPodsDetector.startScanning();
+        } else if (!budsEnabled && airPodsDetector != null) {
+            airPodsDetector.stopScanning();
+            airPodsDetector.destroy();
+            airPodsDetector = null;
+        } else if (budsEnabled && airPodsDetector != null) {
+            airPodsDetector.startScanning();
+        }
+    }
+
+    private void startMangoShare() {
+        try {
+            mangoShareServer = new MangoShareServer(this, "Mango TV");
+            mangoShareServer.setListener(new MangoShareServer.Listener() {
+                @Override
+                public void onIncomingTransferRequested(MangoShareServer.TransferSession session) {
+                    showShareHud(session);
+                }
+
+                @Override
+                public void onTransferProgress(MangoShareServer.TransferSession session, MangoShareServer.FileItem item, long bytesReceived, long totalBytes) {
+                    if (shareProgressBar != null && totalBytes > 0) {
+                        int progress = (int) ((bytesReceived * 100) / totalBytes);
+                        shareProgressBar.setProgress(progress);
+                    }
+                    if (shareSenderDetails != null) {
+                        shareSenderDetails.setText(item.fileName + " • " + formatFileSize(bytesReceived) + " / " + formatFileSize(totalBytes));
+                    }
+                }
+
+                @Override
+                public void onTransferComplete(MangoShareServer.TransferSession session) {
+                    if (shareHudStatus != null) {
+                        shareHudStatus.setText("Transfer Complete");
+                        shareHudStatus.setTextColor(0xFF34C759);
+                    }
+                    if (shareSenderDetails != null) {
+                        shareSenderDetails.setText("Saved " + session.files.size() + " files to Downloads/MangoShare");
+                    }
+                    if (shareProgressBar != null) {
+                        shareProgressBar.setProgress(100);
+                    }
+                    handler.postDelayed(MainActivity.this::dismissShareHud, 3500L);
+                }
+
+                @Override
+                public void onTransferError(MangoShareServer.TransferSession session, String reason) {
+                    if (shareHudStatus != null) {
+                        shareHudStatus.setText("Transfer Failed");
+                        shareHudStatus.setTextColor(0xFFFF3B30);
+                    }
+                    if (shareSenderDetails != null) {
+                        shareSenderDetails.setText(reason);
+                    }
+                    handler.postDelayed(MainActivity.this::dismissShareHud, 2500L);
+                }
+            });
+            mangoShareServer.start();
+        } catch (Throwable t) {
+            Log.w("MainActivity", "Failed to start Mango Share server", t);
+        }
+    }
+
+    private void stopMangoShare() {
+        if (mangoShareServer != null) {
+            mangoShareServer.stop();
+            mangoShareServer = null;
+        }
+        dismissShareHud();
+    }
+
+    private void showShareHud(MangoShareServer.TransferSession session) {
+        if (shareHud == null || session == null) return;
+        currentShareSession = session;
+
+        if (shareHudTitle != null) shareHudTitle.setText("Mango Share");
+        if (shareHudStatus != null) {
+            shareHudStatus.setText("Incoming Transfer");
+            shareHudStatus.setTextColor(0xFF007AFF);
+        }
+        if (shareSenderDetails != null) {
+            shareSenderDetails.setText(session.senderAlias + " • " + session.files.size() + " items (" + formatFileSize(session.totalBytes) + ")");
+        }
+        if (shareButtonsRow != null) shareButtonsRow.setVisibility(View.VISIBLE);
+        if (shareProgressBar != null) shareProgressBar.setVisibility(View.GONE);
+
+        if (shareHud.getVisibility() != View.VISIBLE) {
+            shareHud.setVisibility(View.VISIBLE);
+            shareHud.setAlpha(0f);
+            shareHud.setTranslationY(-24f * density);
+            shareHud.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(260)
+                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .start();
+
+            preShareFocusedView = getCurrentFocus();
+            if (btnShareAccept != null) {
+                btnShareAccept.post(() -> {
+                    btnShareAccept.requestFocus();
+                    updateShareButtonGlass(btnShareAccept, true);
+                });
+            }
+        }
+
+        if (shareAutoDismissRunnable != null) {
+            handler.removeCallbacks(shareAutoDismissRunnable);
+        }
+        shareAutoDismissRunnable = () -> {
+            if (currentShareSession != null && !currentShareSession.isFinished) {
+                currentShareSession.decline();
+            }
+            dismissShareHud();
+        };
+        handler.postDelayed(shareAutoDismissRunnable, 30000L);
+    }
+
+    private void dismissShareHud() {
+        if (shareHud == null || shareHud.getVisibility() != View.VISIBLE) return;
+        if (shareAutoDismissRunnable != null) {
+            handler.removeCallbacks(shareAutoDismissRunnable);
+            shareAutoDismissRunnable = null;
+        }
+
+        shareHud.animate()
+                .alpha(0f)
+                .translationY(-20f * density)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .withEndAction(() -> {
+                    shareHud.setVisibility(View.GONE);
+                    focusedShareButton = null;
+                    currentShareSession = null;
+                    if (preShareFocusedView != null && preShareFocusedView.isAttachedToWindow()) {
+                        preShareFocusedView.requestFocus();
+                        updateCurrentFocusGlass(true);
+                    } else if (dockPill != null) {
+                        View dockTile = getFocusedDockTile();
+                        if (dockTile != null) {
+                            dockTile.requestFocus();
+                            updateDockGlass(dockTile, true);
+                        }
+                    }
+                })
+                .start();
+    }
+
+    private void updateShareButtonGlass(View button, boolean spring) {
+        if (button == null || root == null || glass == null || !button.isAttachedToWindow() || !button.isFocused()) {
+            return;
+        }
+        if (shareAutoDismissRunnable != null) {
+            handler.removeCallbacks(shareAutoDismissRunnable);
+            handler.postDelayed(shareAutoDismissRunnable, 30000L);
+        }
+        focusedShareButton = button;
+        float w = button.getWidth();
+        float h = button.getHeight();
+        float radius = 14f * density;
+        int accent = 0;
+        if (spring) {
+            glideGlassTo(button, w, h, 1.0f, radius, accent, false);
+        } else {
+            snapGlassTo(button, w, h, 1.0f, radius, accent, false);
+        }
+    }
+
+    private void startMangoAirPlay() {
+        try {
+            mangoAirPlayManager = new MangoAirPlayManager(this, "Mango TV");
+            mangoAirPlayManager.setListener(new MangoAirPlayManager.Listener() {
+                @Override
+                public void onAirPlayClientConnected(String clientIp, String deviceName) {
+                    showAirPlayHud("Connected", deviceName);
+                }
+
+                @Override
+                public void onPhotoReceived(Bitmap photo) {
+                    showAirPlayPhoto(photo);
+                }
+
+                @Override
+                public void onVideoPlayRequested(String videoUrl, float startPosition) {
+                    playAirPlayVideo(videoUrl, startPosition);
+                }
+
+                @Override
+                public void onPlaybackRateChanged(float rate) {}
+
+                @Override
+                public void onPlaybackScrub(float position) {}
+
+                @Override
+                public void onAirPlayStopped() {
+                    dismissAirPlayHud();
+                    if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
+                }
+            });
+            mangoAirPlayManager.start();
+        } catch (Throwable t) {
+            Log.w("MainActivity", "Failed to start Mango AirPlay manager", t);
+        }
+    }
+
+    private void stopMangoAirPlay() {
+        if (mangoAirPlayManager != null) {
+            mangoAirPlayManager.stop();
+            mangoAirPlayManager = null;
+        }
+        dismissAirPlayHud();
+        if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
+    }
+
+    private void showAirPlayHud(String status, String clientName) {
+        if (airPlayHud == null) return;
+        if (airPlayHudTitle != null) airPlayHudTitle.setText("AirPlay • " + clientName);
+        if (airPlayHudStatus != null) {
+            airPlayHudStatus.setText(status);
+            airPlayHudStatus.setTextColor(0xFF34C759);
+        }
+
+        if (airPlayHud.getVisibility() != View.VISIBLE) {
+            airPlayHud.setVisibility(View.VISIBLE);
+            airPlayHud.setAlpha(0f);
+            airPlayHud.setTranslationY(-24f * density);
+            airPlayHud.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(260)
+                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .start();
+        }
+
+        if (airPlayAutoDismissRunnable != null) {
+            handler.removeCallbacks(airPlayAutoDismissRunnable);
+        }
+        airPlayAutoDismissRunnable = this::dismissAirPlayHud;
+        handler.postDelayed(airPlayAutoDismissRunnable, 6000L);
+    }
+
+    private void dismissAirPlayHud() {
+        if (airPlayHud == null || airPlayHud.getVisibility() != View.VISIBLE) return;
+        if (airPlayAutoDismissRunnable != null) {
+            handler.removeCallbacks(airPlayAutoDismissRunnable);
+            airPlayAutoDismissRunnable = null;
+        }
+
+        airPlayHud.animate()
+                .alpha(0f)
+                .translationY(-20f * density)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .withEndAction(() -> airPlayHud.setVisibility(View.GONE))
+                .start();
+    }
+
+    private void showAirPlayPhoto(Bitmap photo) {
+        if (photo == null || airPlayPhotoView == null) return;
+        airPlayPhotoView.setImageBitmap(photo);
+        airPlayPhotoView.setVisibility(View.VISIBLE);
+        airPlayPhotoView.setAlpha(0f);
+        airPlayPhotoView.animate()
+                .alpha(1f)
+                .setDuration(300)
+                .start();
+        showAirPlayHud("Photo Cast", "AirPlay");
+    }
+
+    private void playAirPlayVideo(String videoUrl, float startPosition) {
+        if (videoUrl == null || videoUrl.isEmpty()) return;
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(android.net.Uri.parse(videoUrl), "video/*");
+            intent.putExtra("position", (long) (startPosition * 1000));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            showAirPlayHud("Playing Stream", "AirPlay");
+        } catch (Throwable t) {
+            Log.w("MainActivity", "Failed to launch video player for AirPlay", t);
+        }
+    }
+
+    private static String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format(Locale.US, "%.1f KB", bytes / 1024.0);
+        if (bytes < 1024 * 1024 * 1024) return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
+        return String.format(Locale.US, "%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0));
     }
 }

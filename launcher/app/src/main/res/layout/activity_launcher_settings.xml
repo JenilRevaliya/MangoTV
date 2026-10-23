@@ -92,5 +92,57 @@
             style="@style/SettingsRow"
             android:layout_marginTop="18dp"
             android:text="@string/tv_settings" />
+
+        <!-- Mango TV Ecosystem Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="MANGO ECOSYSTEM"
+            android:textColor="#FF007AFF"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-medium" />
+
+        <TextView
+            android:id="@+id/mangoShareChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="12dp"
+            android:text="Mango Share: On" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="LocalSend-compatible local network file receiving. 0 cloud, instant transfer."
+            android:textColor="#FFACB8C1"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/mangoAirPlayChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="14dp"
+            android:text="Mango AirPlay: On" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Cast photos, videos, and media from Apple iPhone, iPad, and Mac."
+            android:textColor="#FFACB8C1"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/mangoBudsChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="14dp"
+            android:text="Mango Buds: On" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Auto-detect AirPods lid opening nearby with Apple TV-grade battery HUD."
+            android:textColor="#FFACB8C1"
+            android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

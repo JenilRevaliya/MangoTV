@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/airPlayHud"
+    android:layout_width="360dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top|end"
+    android:layout_marginTop="28dp"
+    android:layout_marginEnd="36dp"
+    android:background="@drawable/bg_airpods_card"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:elevation="25dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:visibility="gone">
+
+    <ImageView
+        android:id="@+id/airPlayHudIcon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:contentDescription="AirPlay"
+        android:src="@drawable/ic_airplay" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/airPlayHudTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="AirPlay"
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/airPlayHudStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:fontFamily="sans-serif"
+            android:text="Connected • Ready"
+            android:textColor="#FF34C759"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginEnd="4dp"
+        android:background="@drawable/status_dot" />
+</LinearLayout>

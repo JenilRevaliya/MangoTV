@@ -18,9 +18,15 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView animationsChoice;
     private TextView advancedChoice;
     private TextView followThemeChoice;
+    private TextView mangoShareChoice;
+    private TextView mangoAirPlayChoice;
+    private TextView mangoBudsChoice;
     private int columns;
     private boolean animations;
     private boolean advancedEffects;
+    private boolean mangoShare;
+    private boolean mangoAirPlay;
+    private boolean mangoBuds;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -31,6 +37,9 @@ public final class LauncherSettingsActivity extends Activity {
         columns = config.columns;
         animations = config.animations;
         advancedEffects = config.animations && config.advancedEffects;
+        mangoShare = choices.getBoolean("mango_share_enabled", true);
+        mangoAirPlay = choices.getBoolean("mango_airplay_enabled", true);
+        mangoBuds = choices.getBoolean("mango_buds_enabled", true);
 
         int[] ids = {R.id.columns4, R.id.columns5, R.id.columns6, R.id.columns7};
         for (int i = 0; i < ids.length; i++) {
@@ -90,6 +99,31 @@ public final class LauncherSettingsActivity extends Activity {
         });
         findViewById(R.id.tvSettingsChoice).setOnClickListener(v ->
                 open(new Intent(Settings.ACTION_SETTINGS)));
+
+        mangoShareChoice = findViewById(R.id.mangoShareChoice);
+        mangoShareChoice.setOnClickListener(v -> {
+            mangoShare = !mangoShare;
+            choices.edit().putBoolean("mango_share_enabled", mangoShare).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+
+        mangoAirPlayChoice = findViewById(R.id.mangoAirPlayChoice);
+        mangoAirPlayChoice.setOnClickListener(v -> {
+            mangoAirPlay = !mangoAirPlay;
+            choices.edit().putBoolean("mango_airplay_enabled", mangoAirPlay).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+
+        mangoBudsChoice = findViewById(R.id.mangoBudsChoice);
+        mangoBudsChoice.setOnClickListener(v -> {
+            mangoBuds = !mangoBuds;
+            choices.edit().putBoolean("mango_buds_enabled", mangoBuds).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+
         refresh();
         columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
     }
@@ -112,6 +146,18 @@ public final class LauncherSettingsActivity extends Activity {
         advancedChoice.setEnabled(animations);
         advancedChoice.setAlpha(animations ? 1f : 0.5f);
         followThemeChoice.setSelected(!hasOnTvChoices());
+        if (mangoShareChoice != null) {
+            mangoShareChoice.setText("Mango Share: " + (mangoShare ? getString(R.string.on) : getString(R.string.off)));
+            mangoShareChoice.setSelected(mangoShare);
+        }
+        if (mangoAirPlayChoice != null) {
+            mangoAirPlayChoice.setText("Mango AirPlay: " + (mangoAirPlay ? getString(R.string.on) : getString(R.string.off)));
+            mangoAirPlayChoice.setSelected(mangoAirPlay);
+        }
+        if (mangoBudsChoice != null) {
+            mangoBudsChoice.setText("Mango Buds: " + (mangoBuds ? getString(R.string.on) : getString(R.string.off)));
+            mangoBudsChoice.setSelected(mangoBuds);
+        }
     }
 
     private boolean hasOnTvChoices() {
