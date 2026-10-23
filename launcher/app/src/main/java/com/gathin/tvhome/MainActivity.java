@@ -6,6 +6,7 @@ import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.Dialog;
+import android.bluetooth.BluetoothA2dp;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
@@ -23,6 +24,7 @@ import com.gathin.tvhome.settings.MangoSettingsActivity;
 import com.gathin.tvhome.settings.SettingsOverlayController;
 import org.json.JSONObject;
 import android.widget.ProgressBar;
+import android.widget.VideoView;
 import java.lang.reflect.Method;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -152,6 +154,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private MangoConnectivityCoordinator connectivityCoordinator;
     private SettingsOverlayController settingsOverlay;
     private long lastCooldownsClearedTime = 0L;
+    private BluetoothProfile a2dpProxy;
+    private BroadcastReceiver budsConnectionReceiver;
+    private Runnable budsConnectionTimeoutRunnable;
 
     // Mango Remote Server & Pairing
     private MangoRemoteServer mangoRemoteServer;
@@ -199,6 +204,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView airPlayHudTitle;
     private TextView airPlayHudStatus;
     private ImageView airPlayPhotoView;
+    private FrameLayout airPlayVideoContainer;
+    private VideoView airPlayVideoView;
+    private ProgressBar airPlayVideoProgress;
+    private boolean isAirPlayVideoPlaying = false;
     private Runnable airPlayAutoDismissRunnable;
 
     private int heldNavKeyCode = 0;
@@ -694,16 +703,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     if ("com.gathin.tvhome.action.TEST_AIRPODS".equals(action) ||
                             "com.gathin.tvhome.action.TEST_BUDS".equals(action)) {
                         AirPodsDevice mock = new AirPodsDevice("00:11:22:33:44:55");
-                        mock.modelName = "AirPods Pro";
+                        String customName = intent.getStringExtra("name");
+                        mock.modelName = customName != null ? customName : "Jenil's AirPods Pro";
+                        mock.isCustomName = true;
                         mock.modelId = 0x0E20;
-                        mock.leftBattery = 92;
-                        mock.rightBattery = 88;
-                        mock.caseBattery = 74;
-                        mock.isLeftCharging = false;
-                        mock.isRightCharging = false;
-                        mock.isCaseCharging = false;
+                        mock.leftBattery = intent.getIntExtra("left", 80);
+                        mock.rightBattery = intent.getIntExtra("right", -1);
+                        mock.caseBattery = intent.getIntExtra("case", 70);
+                        mock.isLeftCharging = intent.getBooleanExtra("left_charging", false);
+                        mock.isRightCharging = intent.getBooleanExtra("right_charging", false);
+                        mock.isCaseCharging = intent.getBooleanExtra("case_charging", false);
                         mock.lidOpen = true;
                         if (connectivityCoordinator != null) {
+                            connectivityCoordinator.clearCooldowns();
                             connectivityCoordinator.showBudsPrompt(mock);
                         } else {
                             showAirPodsHud(mock);
@@ -2249,6 +2261,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         dismissAirPodsHud();
         dismissShareHud();
         dismissAirPlayHud();
+        stopAirPlayVideo();
     }
 
     @Override
@@ -2270,6 +2283,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        cleanupBudsConnectionReceiver();
+        if (a2dpProxy != null) {
+            try {
+                BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+                if (adapter != null) {
+                    adapter.closeProfileProxy(BluetoothProfile.A2DP, a2dpProxy);
+                }
+            } catch (Throwable ignored) {}
+            a2dpProxy = null;
+        }
         if (airPodsDetector != null) {
             airPodsDetector.destroy();
             airPodsDetector = null;
@@ -2490,6 +2513,28 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
                 if (event.getAction() == KeyEvent.ACTION_UP) {
                     airPlayPhotoView.setVisibility(View.GONE);
+                }
+                return true;
+            }
+        }
+
+        // If AirPlay Video is visible, intercept Back key to stop video or D-pad center to play/pause
+        if (airPlayVideoContainer != null && airPlayVideoContainer.getVisibility() == View.VISIBLE) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    stopAirPlayVideo();
+                }
+                return true;
+            } else if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    if (airPlayVideoView != null) {
+                        if (airPlayVideoView.isPlaying()) {
+                            airPlayVideoView.pause();
+                        } else {
+                            airPlayVideoView.start();
+                        }
+                    }
                 }
                 return true;
             }
@@ -4100,79 +4145,192 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
-    private void connectAirPods(AirPodsDevice airPods) {
+    private void connectAirPods(final AirPodsDevice airPods) {
         if (airPods == null) return;
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter == null || !adapter.isEnabled()) {
+        final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null) return;
+
+        if (!adapter.isEnabled()) {
             try {
-                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
-            } catch (Exception ignored) {}
-            return;
+                adapter.enable();
+            } catch (Throwable ignored) {}
         }
 
+        if (connectivityCoordinator != null) {
+            connectivityCoordinator.onBudsConnecting();
+        }
+
+        // 1. Resolve candidate BluetoothDevice
+        String activeAddress = (airPods.classicAddress != null) ? airPods.classicAddress : airPods.address;
         BluetoothDevice targetDev = null;
         try {
+            if (activeAddress != null) {
+                targetDev = adapter.getRemoteDevice(activeAddress);
+            }
+
+            // Check if there is an existing bonded device with this exact address
             Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-            if (bonded != null) {
+            if (bonded != null && activeAddress != null) {
                 for (BluetoothDevice dev : bonded) {
-                    if (dev.getAddress() != null && dev.getAddress().equalsIgnoreCase(airPods.address)) {
+                    if (dev.getAddress() != null && dev.getAddress().equalsIgnoreCase(activeAddress)) {
                         targetDev = dev;
                         break;
                     }
                 }
-                if (targetDev == null) {
-                    for (BluetoothDevice dev : bonded) {
-                        String name = dev.getName();
-                        if (name != null && name.toLowerCase().contains("airpods")) {
-                            targetDev = dev;
-                            break;
-                        }
-                    }
-                }
             }
-        } catch (SecurityException ignored) {}
+        } catch (Throwable t) {
+            Log.w("MainActivity", "Error finding target device for AirPods", t);
+        }
 
-        if (targetDev != null) {
-            final BluetoothDevice devToConnect = targetDev;
-            if (airPodsBtnConnect != null) {
-                airPodsBtnConnect.setText("Connecting...");
-            }
-            adapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
-                @Override
-                public void onServiceConnected(int profile, BluetoothProfile proxy) {
-                    if (profile == BluetoothProfile.A2DP) {
-                        try {
-                            Method connectMethod = proxy.getClass().getMethod("connect", BluetoothDevice.class);
-                            connectMethod.invoke(proxy, devToConnect);
-                            if (airPodsBtnConnect != null) {
-                                airPodsBtnConnect.setText("Connected");
+        final BluetoothDevice finalTargetDev = targetDev;
+        Log.i("MainActivity", "Attempting AirPods connection to: " + (finalTargetDev != null ? finalTargetDev.getName() + " (" + finalTargetDev.getAddress() + ")" : "null"));
+
+        // Clean up any existing connection receiver
+        cleanupBudsConnectionReceiver();
+
+        final boolean[] connectedEmitted = new boolean[]{false};
+
+        // 2. Register dynamic state receiver for bond and A2DP events
+        budsConnectionReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                    BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR);
+                    Log.i("MainActivity", "Buds bond state changed: " + bondState + " for " + (dev != null ? dev.getAddress() : "null"));
+                    if (bondState == BluetoothDevice.BOND_BONDED && dev != null) {
+                        // Immediately connect A2DP once bonded
+                        connectA2dpProfile(dev);
+                    }
+                } else if (BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                    int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_DISCONNECTED);
+                    BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    Log.i("MainActivity", "A2DP state changed: " + state + " for " + (dev != null ? dev.getAddress() : "null"));
+                    if (state == BluetoothProfile.STATE_CONNECTED && !connectedEmitted[0]) {
+                        connectedEmitted[0] = true;
+                        String name = (dev != null && dev.getName() != null) ? dev.getName() : airPods.getDisplayName();
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.onBudsConnected(name);
+                        }
+                        cleanupBudsConnectionReceiver();
+                    }
+                } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                    BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    Log.i("MainActivity", "Bluetooth ACL connected for " + (dev != null ? dev.getAddress() : "null"));
+                    if (dev != null) {
+                        connectA2dpProfile(dev);
+                    }
+                } else if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                    // If in discovery mode, check for matching AirPods in pairing mode
+                    BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
+                    if (name == null && dev != null) {
+                        try { name = dev.getName(); } catch (SecurityException ignored) {}
+                    }
+                    if (name != null) {
+                        String lower = name.toLowerCase();
+                        if (lower.contains("airpod") || lower.contains("beats") || lower.contains("buds")) {
+                            Log.i("MainActivity", "Found AirPods in discovery: " + name + " (" + dev.getAddress() + ")");
+                            try { adapter.cancelDiscovery(); } catch (Throwable ignored) {}
+                            if (dev.getBondState() != BluetoothDevice.BOND_BONDED) {
+                                dev.createBond();
+                            } else {
+                                connectA2dpProfile(dev);
                             }
-                        } catch (Exception e) {
-                            try {
-                                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
-                            } catch (Exception ignored) {}
                         }
-                        handler.postDelayed(() -> {
-                            try {
-                                adapter.closeProfileProxy(BluetoothProfile.A2DP, proxy);
-                            } catch (Exception ignored) {}
-                            dismissAirPodsHud();
-                        }, 1200L);
                     }
                 }
-
-                @Override
-                public void onServiceDisconnected(int profile) {}
-            }, BluetoothProfile.A2DP);
-        } else {
-            try {
-                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
-            } catch (Exception e) {
-                try {
-                    startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"));
-                } catch (Exception ignored) {}
             }
-            dismissAirPodsHud();
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+        filter.addAction(BluetoothDevice.ACTION_FOUND);
+        registerReceiver(budsConnectionReceiver, filter);
+
+        // 3. Initiate Connection or Bonding
+        if (finalTargetDev != null && finalTargetDev.getBondState() == BluetoothDevice.BOND_BONDED) {
+            // Already bonded: connect A2DP directly
+            connectA2dpProfile(finalTargetDev);
+        } else if (finalTargetDev != null) {
+            // Not bonded or in pairing mode: initiate bond
+            boolean bondStarted = finalTargetDev.createBond();
+            Log.i("MainActivity", "createBond() returned: " + bondStarted + " for " + finalTargetDev.getAddress());
+            // Also start discovery to discover Classic BR/EDR pairing address if different
+            try { adapter.startDiscovery(); } catch (Throwable ignored) {}
+        } else {
+            // No target device: start discovery
+            try { adapter.startDiscovery(); } catch (Throwable ignored) {}
+        }
+
+        // 4. Safety Timeout: if not connected within 9 seconds, show Settings fallback
+        budsConnectionTimeoutRunnable = () -> {
+            if (!connectedEmitted[0]) {
+                Log.w("MainActivity", "AirPods connection timed out after 9s");
+                if (connectivityCoordinator != null) {
+                    connectivityCoordinator.onBudsConnectionFailed("Could not connect directly");
+                }
+                cleanupBudsConnectionReceiver();
+            }
+        };
+        handler.postDelayed(budsConnectionTimeoutRunnable, 9000L);
+    }
+
+    private void connectA2dpProfile(final BluetoothDevice dev) {
+        if (dev == null) return;
+        final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null) return;
+
+        adapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
+            @Override
+            public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                if (profile == BluetoothProfile.A2DP) {
+                    a2dpProxy = proxy;
+                    try {
+                        BluetoothA2dp a2dp = (BluetoothA2dp) proxy;
+                        Method connectMethod = BluetoothA2dp.class.getMethod("connect", BluetoothDevice.class);
+                        connectMethod.invoke(a2dp, dev);
+                        Log.i("MainActivity", "Invoked A2DP connect() on " + dev.getName() + " (" + dev.getAddress() + ")");
+                        try {
+                            Method setPriority = BluetoothA2dp.class.getMethod("setPriority", BluetoothDevice.class, int.class);
+                            setPriority.invoke(a2dp, dev, 100);
+                        } catch (Throwable ignored) {}
+                    } catch (Throwable t) {
+                        Log.e("MainActivity", "Failed to invoke A2DP connect method", t);
+                    }
+                }
+            }
+
+            @Override
+            public void onServiceDisconnected(int profile) {
+                if (profile == BluetoothProfile.A2DP) {
+                    a2dpProxy = null;
+                }
+            }
+        }, BluetoothProfile.A2DP);
+    }
+
+    private void cleanupBudsConnectionReceiver() {
+        if (budsConnectionTimeoutRunnable != null) {
+            handler.removeCallbacks(budsConnectionTimeoutRunnable);
+            budsConnectionTimeoutRunnable = null;
+        }
+        if (budsConnectionReceiver != null) {
+            try {
+                unregisterReceiver(budsConnectionReceiver);
+            } catch (Throwable ignored) {}
+            budsConnectionReceiver = null;
+        }
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter != null) {
+            try {
+                if (adapter.isDiscovering()) {
+                    adapter.cancelDiscovery();
+                }
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -4295,6 +4453,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (airPlayPhotoView != null) {
             airPlayPhotoView.setOnClickListener(v -> airPlayPhotoView.setVisibility(View.GONE));
         }
+        airPlayVideoContainer = findViewById(R.id.airPlayVideoContainer);
+        airPlayVideoView = findViewById(R.id.airPlayVideoView);
+        airPlayVideoProgress = findViewById(R.id.airPlayVideoProgress);
     }
 
     private void initMangoEcosystem() {
@@ -4316,7 +4477,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             stopMangoShare();
         }
 
-        boolean airPlayEnabled = prefs.getBoolean("mango_airplay_enabled", true);
+        boolean airPlayEnabled = prefs.getBoolean("mango_play_enabled", true) && prefs.getBoolean("mango_airplay_enabled", true);
         if (airPlayEnabled && mangoAirPlayManager == null) {
             startMangoAirPlay();
         } else if (!airPlayEnabled && mangoAirPlayManager != null) {
@@ -4597,6 +4758,38 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void startMangoAirPlay() {
         try {
             mangoAirPlayManager = new MangoAirPlayManager(this, "Mango TV");
+            mangoAirPlayManager.setPlaybackInfoProvider(new MangoAirPlayManager.PlaybackInfoProvider() {
+                @Override
+                public float getPosition() {
+                    if (airPlayVideoView != null && isAirPlayVideoPlaying) {
+                        try {
+                            return airPlayVideoView.getCurrentPosition() / 1000f;
+                        } catch (Throwable ignored) {}
+                    }
+                    return 0f;
+                }
+
+                @Override
+                public float getDuration() {
+                    if (airPlayVideoView != null && isAirPlayVideoPlaying) {
+                        try {
+                            int dur = airPlayVideoView.getDuration();
+                            if (dur > 0) return dur / 1000f;
+                        } catch (Throwable ignored) {}
+                    }
+                    return 0f;
+                }
+
+                @Override
+                public float getPlaybackRate() {
+                    return (airPlayVideoView != null && isAirPlayVideoPlaying && airPlayVideoView.isPlaying()) ? 1.0f : 0.0f;
+                }
+
+                @Override
+                public boolean isPlaying() {
+                    return airPlayVideoView != null && isAirPlayVideoPlaying && airPlayVideoView.isPlaying();
+                }
+            });
             mangoAirPlayManager.setListener(new MangoAirPlayManager.Listener() {
                 @Override
                 public void onAirPlayClientConnected(String clientIp, String deviceName) {
@@ -4614,36 +4807,34 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
                 @Override
                 public void onVideoPlayRequested(String videoUrl, float startPosition) {
-                    SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
-                    if (!prefs.getBoolean("mango_play_enabled", true) || !prefs.getBoolean("mango_prompts_enabled", true)) {
-                        playAirPlayVideo(videoUrl, startPosition);
-                        return;
-                    }
-                    if (connectivityCoordinator != null) {
-                        PlayHandoffRequest req = new PlayHandoffRequest(
-                                "airplay-" + System.currentTimeMillis(),
-                                "Apple Device",
-                                "AirPlay Video",
-                                "Streaming Video • 1080p",
-                                videoUrl,
-                                (long) (startPosition * 1000),
-                                0,
-                                null
-                        );
-                        connectivityCoordinator.showPlayHandoffPrompt(req);
-                    } else {
-                        playAirPlayVideo(videoUrl, startPosition);
-                    }
+                    playAirPlayVideo(videoUrl, startPosition);
                 }
 
                 @Override
-                public void onPlaybackRateChanged(float rate) {}
+                public void onPlaybackRateChanged(float rate) {
+                    runOnUiThread(() -> {
+                        if (airPlayVideoView != null && isAirPlayVideoPlaying) {
+                            if (rate <= 0f) {
+                                airPlayVideoView.pause();
+                            } else {
+                                airPlayVideoView.start();
+                            }
+                        }
+                    });
+                }
 
                 @Override
-                public void onPlaybackScrub(float position) {}
+                public void onPlaybackScrub(float position) {
+                    runOnUiThread(() -> {
+                        if (airPlayVideoView != null && isAirPlayVideoPlaying) {
+                            airPlayVideoView.seekTo((int) (position * 1000));
+                        }
+                    });
+                }
 
                 @Override
                 public void onAirPlayStopped() {
+                    stopAirPlayVideo();
                     if (connectivityCoordinator != null) {
                         connectivityCoordinator.dismissDialog();
                         connectivityCoordinator.dismissStatusPill();
@@ -4664,6 +4855,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mangoAirPlayManager.stop();
             mangoAirPlayManager = null;
         }
+        stopAirPlayVideo();
         stopMangoRemote();
         dismissAirPlayHud();
         if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
@@ -4714,6 +4906,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void showAirPlayPhoto(Bitmap photo) {
         if (photo == null || airPlayPhotoView == null) return;
+        stopAirPlayVideo();
         airPlayPhotoView.setImageBitmap(photo);
         airPlayPhotoView.setVisibility(View.VISIBLE);
         airPlayPhotoView.setAlpha(0f);
@@ -4726,16 +4919,66 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void playAirPlayVideo(String videoUrl, float startPosition) {
         if (videoUrl == null || videoUrl.isEmpty()) return;
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(android.net.Uri.parse(videoUrl), "video/*");
-            intent.putExtra("position", (long) (startPosition * 1000));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-            showAirPlayHud("Playing Stream", "AirPlay");
-        } catch (Throwable t) {
-            Log.w("MainActivity", "Failed to launch video player for AirPlay", t);
-        }
+        runOnUiThread(() -> {
+            try {
+                if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
+                if (airPlayVideoContainer != null) {
+                    airPlayVideoContainer.setVisibility(View.VISIBLE);
+                    airPlayVideoContainer.setAlpha(0f);
+                    airPlayVideoContainer.animate().alpha(1f).setDuration(250).start();
+                }
+                if (airPlayVideoProgress != null) airPlayVideoProgress.setVisibility(View.VISIBLE);
+
+                if (airPlayVideoView != null) {
+                    airPlayVideoView.stopPlayback();
+                    airPlayVideoView.setVideoPath(videoUrl);
+                    airPlayVideoView.setOnPreparedListener(mp -> {
+                        if (airPlayVideoProgress != null) airPlayVideoProgress.setVisibility(View.GONE);
+                        isAirPlayVideoPlaying = true;
+                        if (startPosition > 0) {
+                            airPlayVideoView.seekTo((int) (startPosition * 1000));
+                        }
+                        airPlayVideoView.start();
+                    });
+                    airPlayVideoView.setOnCompletionListener(mp -> {
+                        stopAirPlayVideo();
+                    });
+                    airPlayVideoView.setOnErrorListener((mp, what, extra) -> {
+                        Log.w("MainActivity", "AirPlay VideoView playback error: " + what + ", " + extra);
+                        stopAirPlayVideo();
+                        return true;
+                    });
+                }
+
+                if (connectivityCoordinator != null) {
+                    connectivityCoordinator.showStatusPill("AirPlay", "Playing Video", R.drawable.ic_airplay);
+                } else {
+                    showAirPlayHud("Playing Stream", "AirPlay");
+                }
+            } catch (Throwable t) {
+                Log.e("MainActivity", "Failed to play AirPlay video", t);
+                stopAirPlayVideo();
+            }
+        });
+    }
+
+    private void stopAirPlayVideo() {
+        runOnUiThread(() -> {
+            isAirPlayVideoPlaying = false;
+            if (airPlayVideoView != null) {
+                try {
+                    airPlayVideoView.stopPlayback();
+                } catch (Throwable ignored) {}
+            }
+            if (airPlayVideoContainer != null) {
+                airPlayVideoContainer.animate()
+                        .alpha(0f)
+                        .setDuration(200)
+                        .withEndAction(() -> airPlayVideoContainer.setVisibility(View.GONE))
+                        .start();
+            }
+            if (airPlayVideoProgress != null) airPlayVideoProgress.setVisibility(View.GONE);
+        });
     }
 
     private static String formatFileSize(long bytes) {

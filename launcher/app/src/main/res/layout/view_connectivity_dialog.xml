@@ -97,12 +97,23 @@
                 android:contentDescription="AirPods Case"
                 android:src="@drawable/ic_airpods_case_open" />
 
+            <TextView
+                android:id="@+id/budsDeviceName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="AirPods Pro"
+                android:textColor="#FFFFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
             <!-- Battery Row (Left, Right, Case) -->
             <LinearLayout
                 android:id="@+id/budsBatteryRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="12dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -117,7 +128,8 @@
                     android:paddingStart="8dp"
                     android:paddingEnd="8dp"
                     android:paddingTop="3dp"
-                    android:paddingBottom="3dp">
+                    android:paddingBottom="3dp"
+                    android:visibility="gone">
 
                     <ImageView
                         android:layout_width="14dp"
@@ -130,7 +142,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="92% Left"
+                        android:text=""
                         android:textColor="#FFE5E5EA"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -147,7 +159,8 @@
                     android:paddingStart="8dp"
                     android:paddingEnd="8dp"
                     android:paddingTop="3dp"
-                    android:paddingBottom="3dp">
+                    android:paddingBottom="3dp"
+                    android:visibility="gone">
 
                     <ImageView
                         android:layout_width="14dp"
@@ -160,7 +173,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="88% Right"
+                        android:text=""
                         android:textColor="#FFE5E5EA"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -177,7 +190,8 @@
                     android:paddingStart="8dp"
                     android:paddingEnd="8dp"
                     android:paddingTop="3dp"
-                    android:paddingBottom="3dp">
+                    android:paddingBottom="3dp"
+                    android:visibility="gone">
 
                     <ImageView
                         android:layout_width="14dp"
@@ -190,7 +204,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="74% Case"
+                        android:text=""
                         android:textColor="#FFE5E5EA"
                         android:textSize="12sp" />
                 </LinearLayout>

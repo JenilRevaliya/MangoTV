@@ -473,6 +473,31 @@
         android:visibility="gone"
         android:elevation="35dp" />
 
+    <!-- Fullscreen AirPlay video playback overlay -->
+    <FrameLayout
+        android:id="@+id/airPlayVideoContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF000000"
+        android:visibility="gone"
+        android:elevation="36dp">
+
+        <VideoView
+            android:id="@+id/airPlayVideoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
+
+        <ProgressBar
+            android:id="@+id/airPlayVideoProgress"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:indeterminateTint="#FFFFFFFF"
+            android:visibility="gone" />
+    </FrameLayout>
+
     <!-- The single floating glass highlight that springs between tiles. -->
     <com.gathin.tvhome.GlassView
         android:id="@+id/glass"

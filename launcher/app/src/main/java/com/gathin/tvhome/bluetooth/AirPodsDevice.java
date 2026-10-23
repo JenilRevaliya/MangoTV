@@ -2,7 +2,9 @@ package com.gathin.tvhome.bluetooth;
 
 public class AirPodsDevice {
     public final String address;
+    public String classicAddress;
     public String modelName;
+    public boolean isCustomName;
     public int modelId;
     public int leftBattery = -1;
     public int rightBattery = -1;
@@ -20,6 +22,13 @@ public class AirPodsDevice {
     public AirPodsDevice(String address) {
         this.address = address;
         this.lastSeenMs = System.currentTimeMillis();
+    }
+
+    public String getDisplayName() {
+        if (modelName != null && !modelName.trim().isEmpty()) {
+            return modelName.trim();
+        }
+        return resolveModelName(modelId);
     }
 
     public static String resolveModelName(int modelId) {

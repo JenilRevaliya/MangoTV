@@ -1,6 +1,7 @@
 package com.gathin.tvhome.connectivity;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
@@ -72,9 +73,13 @@ public class MangoConnectivityCoordinator {
     // Panel 1: Buds Views
     private View panelBuds;
     private ImageView budsCaseImage;
+    private TextView budsDeviceName;
     private View budsBatteryRow;
+    private View budsBatteryLeftPill;
     private TextView budsBatteryLeftText;
+    private View budsBatteryRightPill;
     private TextView budsBatteryRightText;
+    private View budsBatteryCasePill;
     private TextView budsBatteryCaseText;
     private TextView budsBatteryUnavailableText;
 
@@ -147,9 +152,13 @@ public class MangoConnectivityCoordinator {
 
             panelBuds = overlayRoot.findViewById(R.id.panelBuds);
             budsCaseImage = overlayRoot.findViewById(R.id.budsCaseImage);
+            budsDeviceName = overlayRoot.findViewById(R.id.budsDeviceName);
             budsBatteryRow = overlayRoot.findViewById(R.id.budsBatteryRow);
+            budsBatteryLeftPill = overlayRoot.findViewById(R.id.budsBatteryLeftPill);
             budsBatteryLeftText = overlayRoot.findViewById(R.id.budsBatteryLeftText);
+            budsBatteryRightPill = overlayRoot.findViewById(R.id.budsBatteryRightPill);
             budsBatteryRightText = overlayRoot.findViewById(R.id.budsBatteryRightText);
+            budsBatteryCasePill = overlayRoot.findViewById(R.id.budsBatteryCasePill);
             budsBatteryCaseText = overlayRoot.findViewById(R.id.budsBatteryCaseText);
             budsBatteryUnavailableText = overlayRoot.findViewById(R.id.budsBatteryUnavailableText);
 
@@ -213,8 +222,18 @@ public class MangoConnectivityCoordinator {
     // ---- Mango Buds Flow -------------------------------------------------------------------------
 
     public boolean showBudsPrompt(AirPodsDevice device) {
+        if (overlayRoot == null || overlayRoot.getVisibility() != View.VISIBLE) {
+            currentPriority = PRIORITY_NONE;
+        }
         if (device == null || isCoolingDown("buds:" + device.address)) {
             return false;
+        }
+        // If buds prompt is already showing for this device, update its status in real-time
+        if (currentPriority == PRIORITY_BUDS && activeBudsDevice != null &&
+                (activeBudsDevice.address.equals(device.address) || 
+                 (activeBudsDevice.classicAddress != null && activeBudsDevice.classicAddress.equalsIgnoreCase(device.classicAddress)))) {
+            updateBudsStatus(device);
+            return true;
         }
         // Do not interrupt active transfer or equal/higher priority
         if (currentPriority >= PRIORITY_BUDS && currentPriority != PRIORITY_STATUS_PILL) {
@@ -232,45 +251,28 @@ public class MangoConnectivityCoordinator {
         }
         if (titleView != null) titleView.setText("Mango Buds");
         if (subtitleView != null) {
-            subtitleView.setText(device.modelName + " detected nearby");
+            subtitleView.setText(device.getDisplayName());
+        }
+        if (budsDeviceName != null) {
+            budsDeviceName.setText(device.getDisplayName());
         }
 
         // Show Panel 1: Buds
         showOnlyPanel(panelBuds);
 
-        // Battery logic: only show when genuinely available
-        boolean hasLeft = device.leftBattery >= 0;
-        boolean hasRight = device.rightBattery >= 0;
-        boolean hasCase = device.caseBattery >= 0;
-
-        if (budsBatteryRow != null && budsBatteryUnavailableText != null) {
-            if (hasLeft || hasRight || hasCase) {
-                budsBatteryRow.setVisibility(View.VISIBLE);
-                budsBatteryUnavailableText.setVisibility(View.GONE);
-
-                if (budsBatteryLeftText != null) {
-                    budsBatteryLeftText.setText(device.formatBattery(device.leftBattery) + " Left");
-                }
-                if (budsBatteryRightText != null) {
-                    budsBatteryRightText.setText(device.formatBattery(device.rightBattery) + " Right");
-                }
-                if (budsBatteryCaseText != null) {
-                    budsBatteryCaseText.setText(device.formatBattery(device.caseBattery) + " Case");
-                }
-            } else {
-                budsBatteryRow.setVisibility(View.GONE);
-                budsBatteryUnavailableText.setVisibility(View.VISIBLE);
-            }
-        }
+        // Battery logic: dynamically show only available earbuds/case
+        updateBudsBatteryDisplay(device);
 
         // Configure Buttons: Connect / Decline
         if (buttonsRow != null) buttonsRow.setVisibility(View.VISIBLE);
         if (btnPrimary != null) {
             btnPrimary.setText("Connect");
+            btnPrimary.setEnabled(true);
             btnPrimary.setVisibility(View.VISIBLE);
         }
         if (btnSecondary != null) {
             btnSecondary.setText("Decline");
+            btnSecondary.setEnabled(true);
             btnSecondary.setVisibility(View.VISIBLE);
         }
 
@@ -280,16 +282,56 @@ public class MangoConnectivityCoordinator {
 
     public void updateBudsStatus(AirPodsDevice device) {
         if (currentPriority == PRIORITY_BUDS && activeBudsDevice != null &&
-                activeBudsDevice.address.equals(device.address)) {
+                (activeBudsDevice.address.equals(device.address) || 
+                 (activeBudsDevice.classicAddress != null && activeBudsDevice.classicAddress.equalsIgnoreCase(device.classicAddress)))) {
             activeBudsDevice = device;
-            if (device.leftBattery >= 0 && budsBatteryLeftText != null) {
-                budsBatteryLeftText.setText(device.formatBattery(device.leftBattery) + " Left");
+            if (subtitleView != null) {
+                subtitleView.setText(device.getDisplayName());
             }
-            if (device.rightBattery >= 0 && budsBatteryRightText != null) {
-                budsBatteryRightText.setText(device.formatBattery(device.rightBattery) + " Right");
+            if (budsDeviceName != null) {
+                budsDeviceName.setText(device.getDisplayName());
             }
-            if (device.caseBattery >= 0 && budsBatteryCaseText != null) {
-                budsBatteryCaseText.setText(device.formatBattery(device.caseBattery) + " Case");
+            updateBudsBatteryDisplay(device);
+        }
+    }
+
+    private void updateBudsBatteryDisplay(AirPodsDevice device) {
+        if (device == null) return;
+        boolean hasLeft = device.leftBattery >= 0;
+        boolean hasRight = device.rightBattery >= 0;
+        boolean hasCase = device.caseBattery >= 0;
+
+        if (budsBatteryRow != null && budsBatteryUnavailableText != null) {
+            if (hasLeft || hasRight || hasCase) {
+                budsBatteryRow.setVisibility(View.VISIBLE);
+                budsBatteryUnavailableText.setVisibility(View.GONE);
+
+                if (budsBatteryLeftPill != null) {
+                    budsBatteryLeftPill.setVisibility(hasLeft ? View.VISIBLE : View.GONE);
+                }
+                if (hasLeft && budsBatteryLeftText != null) {
+                    String charging = device.isLeftCharging ? " ⚡" : "";
+                    budsBatteryLeftText.setText(device.leftBattery + "% Left" + charging);
+                }
+
+                if (budsBatteryRightPill != null) {
+                    budsBatteryRightPill.setVisibility(hasRight ? View.VISIBLE : View.GONE);
+                }
+                if (hasRight && budsBatteryRightText != null) {
+                    String charging = device.isRightCharging ? " ⚡" : "";
+                    budsBatteryRightText.setText(device.rightBattery + "% Right" + charging);
+                }
+
+                if (budsBatteryCasePill != null) {
+                    budsBatteryCasePill.setVisibility(hasCase ? View.VISIBLE : View.GONE);
+                }
+                if (hasCase && budsBatteryCaseText != null) {
+                    String charging = device.isCaseCharging ? " ⚡" : "";
+                    budsBatteryCaseText.setText(device.caseBattery + "% Case" + charging);
+                }
+            } else {
+                budsBatteryRow.setVisibility(View.GONE);
+                budsBatteryUnavailableText.setVisibility(View.VISIBLE);
             }
         }
     }
@@ -493,9 +535,12 @@ public class MangoConnectivityCoordinator {
 
     private void handlePrimaryAction() {
         if (currentPriority == PRIORITY_BUDS && activeBudsDevice != null) {
-            if (btnPrimary != null) btnPrimary.setText("Connecting...");
+            if (btnPrimary != null) {
+                btnPrimary.setText("Connecting...");
+                btnPrimary.setEnabled(false);
+            }
             if (listener != null) listener.onConnectBuds(activeBudsDevice);
-            handler.postDelayed(this::dismissDialog, 1500L);
+            // MainActivity handles connection state callbacks: onBudsConnected() or onBudsConnectionFailed()
         } else if (currentPriority == PRIORITY_SHARE_PROMPT && activeShareSession != null) {
             if (listener != null) listener.onAcceptShare(activeShareSession);
         } else if (currentPriority == PRIORITY_PLAY && activePlayRequest != null) {
@@ -503,6 +548,52 @@ public class MangoConnectivityCoordinator {
             dismissDialog();
             if (listener != null) listener.onPlayHandoffConfirmed(req);
         }
+    }
+
+    public void onBudsConnecting() {
+        if (btnPrimary != null) {
+            btnPrimary.setText("Connecting...");
+            btnPrimary.setEnabled(false);
+        }
+    }
+
+    public void onBudsConnected(String deviceName) {
+        if (btnPrimary != null) {
+            btnPrimary.setText("Connected ✓");
+            btnPrimary.setEnabled(true);
+        }
+        if (subtitleView != null) {
+            subtitleView.setText((deviceName != null ? deviceName : "AirPods") + " Connected");
+        }
+        handler.postDelayed(this::dismissDialog, 2200L);
+    }
+
+    public void onBudsConnectionFailed(String reason) {
+        if (btnPrimary != null) {
+            btnPrimary.setText("Pair in Settings");
+            btnPrimary.setEnabled(true);
+            btnPrimary.setOnClickListener(v -> {
+                safeLaunchBluetoothSettings();
+                dismissDialog();
+            });
+            btnPrimary.requestFocus();
+        }
+        if (subtitleView != null) {
+            subtitleView.setText(reason != null ? reason : "Connection timeout");
+        }
+    }
+
+    private void safeLaunchBluetoothSettings() {
+        try {
+            Intent[] intents = com.gathin.tvhome.settings.connectivity.SystemConnectivityHelper.getBluetoothSettingsIntents();
+            for (Intent intent : intents) {
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(intent);
+                    return;
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
     }
 
     private void handleSecondaryAction() {
