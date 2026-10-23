@@ -20,6 +20,7 @@ import com.gathin.tvhome.remote.MangoRemotePairingManager;
 import com.gathin.tvhome.remote.MangoRemoteProtocol;
 import com.gathin.tvhome.remote.MangoRemoteServer;
 import com.gathin.tvhome.settings.MangoSettingsActivity;
+import com.gathin.tvhome.settings.SettingsOverlayController;
 import org.json.JSONObject;
 import android.widget.ProgressBar;
 import java.lang.reflect.Method;
@@ -149,6 +150,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     // Mango TV Unified Connectivity Coordinator
     private MangoConnectivityCoordinator connectivityCoordinator;
+    private SettingsOverlayController settingsOverlay;
     private long lastCooldownsClearedTime = 0L;
 
     // Mango Remote Server & Pairing
@@ -546,7 +548,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
             return true;
         });
-        btnSettings.setOnClickListener(v -> open(new Intent(this, MangoSettingsActivity.class)));
+        btnSettings.setOnClickListener(v -> {
+            stopNavHolding();
+            if (settingsOverlay != null) {
+                settingsOverlay.toggle();
+            } else {
+                open(systemIntent(Settings.ACTION_SETTINGS));
+            }
+        });
         btnReorder = findViewById(R.id.btnReorder);
         btnReorder.setOnClickListener(v -> toggleReorder());
         btnReorder.setVisibility(cfg.reorderButton ? View.VISIBLE : View.GONE);
@@ -660,6 +669,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .build(), vpnCallback);
         }
         initConnectivityCoordinator();
+        initSettingsOverlay();
         initAirPodsViews();
         initShareViews();
         initAirPlayViews();
@@ -675,6 +685,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             testFilter.addAction("com.gathin.tvhome.action.TEST_PILL");
             testFilter.addAction("com.gathin.tvhome.action.START_REMOTE_PAIRING");
             testFilter.addAction("com.gathin.tvhome.action.TEST_REMOTE_PAIRING");
+            testFilter.addAction("com.gathin.tvhome.action.OPEN_SETTINGS");
+            testFilter.addAction("com.gathin.tvhome.action.CLOSE_SETTINGS");
             registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
@@ -732,6 +744,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     } else if ("com.gathin.tvhome.action.START_REMOTE_PAIRING".equals(action) ||
                             "com.gathin.tvhome.action.TEST_REMOTE_PAIRING".equals(action)) {
                         startMangoRemotePairing();
+                    } else if ("com.gathin.tvhome.action.OPEN_SETTINGS".equals(action)) {
+                        if (settingsOverlay != null) settingsOverlay.show();
+                    } else if ("com.gathin.tvhome.action.CLOSE_SETTINGS".equals(action)) {
+                        if (settingsOverlay != null) settingsOverlay.dismiss();
                     }
                 }
             }, testFilter);
@@ -2097,6 +2113,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         promptsPaused = false;
         refreshMangoEcosystem();
+        if (settingsOverlay != null && settingsOverlay.isOpen()) {
+            settingsOverlay.refreshState();
+        }
         if (rebuildOnResume) {
             tilesReady = false;
             reloadApps(true);
@@ -2295,8 +2314,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         for (int code : settingsKeycodes) {
             if (event.getKeyCode() != code) continue;
             if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                open(settingsKeyPanel ? new Intent(this, QuickSettingsActivity.class)
-                        : systemIntent(Settings.ACTION_SETTINGS));
+                if (settingsOverlay != null) {
+                    settingsOverlay.toggle();
+                } else {
+                    open(settingsKeyPanel ? new Intent(this, QuickSettingsActivity.class)
+                            : systemIntent(Settings.ACTION_SETTINGS));
+                }
             }
             return true;
         }
@@ -2439,6 +2462,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (ok && pos >= 0) {
                 if (!down) pickUp(pos);
                 return true;
+            }
+            return super.dispatchKeyEvent(event);
+        }
+
+        // If Settings Overlay is open, route keys directly to panel with strict focus trap
+        if (settingsOverlay != null && settingsOverlay.isOpen()) {
+            if (handleSettingsKey(event)) return true;
+            stopNavHolding();
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    settingsOverlay.handleBack();
+                }
+                return true;
+            }
+            settingsOverlay.ensureFocus();
+            if (event.getAction() == KeyEvent.ACTION_DOWN && isNavKey(code)) {
+                playAppleClickSound();
             }
             return super.dispatchKeyEvent(event);
         }
@@ -4133,6 +4174,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             dismissAirPodsHud();
         }
+    }
+
+    // ---- Settings Overlay ------------------------------------------------------------------------
+
+    private void initSettingsOverlay() {
+        View overlayRoot = findViewById(R.id.settingsOverlayRoot);
+        if (overlayRoot == null) return;
+        settingsOverlay = new SettingsOverlayController(this, overlayRoot);
+        settingsOverlay.setOnDismissListener(() -> {
+            if (btnSettings != null) {
+                btnSettings.requestFocus();
+            }
+        });
     }
 
     // ---- Mango TV Ecosystem (Share, AirPlay & Buds) -----------------------------------------------

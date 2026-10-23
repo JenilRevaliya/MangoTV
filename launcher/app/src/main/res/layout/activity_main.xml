@@ -460,6 +460,9 @@
     <!-- Mango TV Connectivity Top-Right Status Pill -->
     <include layout="@layout/view_connectivity_pill" />
 
+    <!-- Apple-inspired Premium Glass Settings Overlay -->
+    <include layout="@layout/view_settings_overlay" />
+
     <!-- Fullscreen AirPlay photo receiver overlay -->
     <ImageView
         android:id="@+id/airPlayPhotoView"

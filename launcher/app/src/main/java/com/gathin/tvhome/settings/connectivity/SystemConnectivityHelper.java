@@ -3,6 +3,7 @@ package com.gathin.tvhome.settings.connectivity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
@@ -154,22 +155,55 @@ public final class SystemConnectivityHelper {
         return new BtState(true, true, pairedCount, connectedNames, summary);
     }
 
+    public static Intent[] getWifiSettingsIntents() {
+        return new Intent[]{
+                new Intent(Settings.ACTION_WIFI_SETTINGS),
+                new Intent().setComponent(new ComponentName("com.amazon.tv.settings.v2", "com.amazon.tv.settings.v2.tv.network.NetworkActivity")),
+                new Intent().setComponent(new ComponentName("com.android.tv.settings", "com.android.tv.settings.connectivity.NetworkActivity")),
+                new Intent(Settings.ACTION_SETTINGS)
+        };
+    }
+
     public static Intent getWifiSettingsIntent() {
-        return new Intent(Settings.ACTION_WIFI_SETTINGS);
+        return getWifiSettingsIntents()[0];
+    }
+
+    public static Intent[] getBluetoothSettingsIntents() {
+        return new Intent[]{
+                new Intent(Settings.ACTION_BLUETOOTH_SETTINGS),
+                new Intent().setComponent(new ComponentName("com.amazon.tv.settings.v2", "com.amazon.tv.settings.v2.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity")),
+                new Intent().setComponent(new ComponentName("com.amazon.tv.settings", "com.amazon.tv.settings.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity")),
+                new Intent().setComponent(new ComponentName("com.android.tv.settings", "com.android.tv.settings.connectivity.BluetoothActivity")),
+                new Intent(Settings.ACTION_SETTINGS)
+        };
     }
 
     public static Intent getBluetoothSettingsIntent() {
-        return new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+        return getBluetoothSettingsIntents()[0];
+    }
+
+    public static Intent[] getDisplaySettingsIntents() {
+        return new Intent[]{
+                new Intent(Settings.ACTION_DISPLAY_SETTINGS),
+                new Intent(Settings.ACTION_SOUND_SETTINGS),
+                new Intent().setComponent(new ComponentName("com.amazon.tv.settings.v2", "com.amazon.tv.settings.v2.tv.display_sounds.DisplayAndSoundsActivity")),
+                new Intent(Settings.ACTION_SETTINGS)
+        };
     }
 
     public static Intent getSoundSettingsIntent() {
         return new Intent(Settings.ACTION_SOUND_SETTINGS);
     }
 
+    public static Intent[] getDeviceSettingsIntents() {
+        return new Intent[]{
+                new Intent(Settings.ACTION_SETTINGS),
+                new Intent().setComponent(new ComponentName("com.amazon.tv.settings.v2", "com.amazon.tv.settings.v2.tv.device.DeviceActivity"))
+        };
+    }
+
     public static Intent getDeviceSettingsIntent() {
-        Intent intent = new Intent(Settings.ACTION_SETTINGS);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        return intent;
+        return getDeviceSettingsIntents()[0];
     }
 
     public static String getLocalIpAddress() {

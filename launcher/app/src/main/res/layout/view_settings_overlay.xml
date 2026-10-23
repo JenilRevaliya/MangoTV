@@ -1,0 +1,758 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settingsOverlayRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:elevation="80dp"
+    android:focusable="false"
+    android:clickable="true"
+    android:visibility="gone">
+
+    <!-- Dimming Scrim: Clicking closes the overlay -->
+    <View
+        android:id="@+id/settingsScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#73000000"
+        android:clickable="true"
+        android:focusable="false" />
+
+    <!-- Right-Side Floating Glass Panel (~37% Screen Width) -->
+    <LinearLayout
+        android:id="@+id/settingsPanel"
+        android:layout_width="366dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="26dp"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/bg_settings_glass_panel"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="18dp">
+
+        <!-- Header: "Settings" with monochrome close button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/sf_bold"
+                android:text="Settings"
+                android:textColor="#FFFFFFFF"
+                android:textSize="22sp" />
+
+            <FrameLayout
+                android:id="@+id/btnSettingsClose"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_settings_close_btn"
+                android:clickable="true"
+                android:focusable="true"
+                android:nextFocusUp="@+id/btnSettingsClose"
+                android:nextFocusDown="@+id/cardSettingsWifi"
+                android:nextFocusLeft="@+id/cardSettingsWifi"
+                android:nextFocusRight="@+id/btnSettingsClose">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_settings_close"
+                    android:tint="#FFFFFFFF" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Scrollable Content -->
+        <ScrollView
+            android:id="@+id/settingsScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="16dp"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Side-by-side Connectivity Cards -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:orientation="horizontal">
+
+                    <!-- Wi-Fi Card -->
+                    <LinearLayout
+                        android:id="@+id/cardSettingsWifi"
+                        android:layout_width="0dp"
+                        android:layout_height="100dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_settings_tile_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:nextFocusUp="@+id/btnSettingsClose"
+                        android:nextFocusRight="@+id/cardSettingsBluetooth"
+                        android:nextFocusLeft="@+id/cardSettingsWifi"
+                        android:nextFocusDown="@+id/rowSettingsShare"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:src="@drawable/ic_wifi"
+                                android:tint="#FFFFFFFF" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="1dp"
+                                android:layout_weight="1" />
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:src="@drawable/ic_chevron_right"
+                                android:tint="#66FFFFFF" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/sf_bold"
+                            android:text="Wi-Fi"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/textSettingsWifiStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/sf_regular"
+                            android:text="Connected"
+                            android:textColor="#FFA1A1A6"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/textSettingsWifiSsid"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:fontFamily="@font/sf_medium"
+                            android:maxLines="1"
+                            android:text="Soni's_4G"
+                            android:textColor="#80A1A1A6"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <!-- Bluetooth Card -->
+                    <LinearLayout
+                        android:id="@+id/cardSettingsBluetooth"
+                        android:layout_width="0dp"
+                        android:layout_height="100dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_settings_tile_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:nextFocusUp="@+id/btnSettingsClose"
+                        android:nextFocusLeft="@+id/cardSettingsWifi"
+                        android:nextFocusRight="@+id/cardSettingsBluetooth"
+                        android:nextFocusDown="@+id/rowSettingsShare"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:src="@drawable/ic_bluetooth"
+                                android:tint="#FFFFFFFF" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="1dp"
+                                android:layout_weight="1" />
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:src="@drawable/ic_chevron_right"
+                                android:tint="#66FFFFFF" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="0dp"
+                            android:layout_weight="1" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/sf_bold"
+                            android:text="Bluetooth"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/textSettingsBtStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/sf_regular"
+                            android:text="On"
+                            android:textColor="#FFA1A1A6"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/textSettingsBtDevices"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:fontFamily="@font/sf_regular"
+                            android:maxLines="1"
+                            android:text="2 devices connected"
+                            android:textColor="#80A1A1A6"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Group 1: Connectivity Services -->
+                <LinearLayout
+                    android:id="@+id/groupMangoServices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_settings_group_card"
+                    android:orientation="vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp">
+
+                    <!-- Mango Share -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingsShare"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/bg_settings_row_item"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:nextFocusUp="@+id/cardSettingsWifi"
+                        android:nextFocusDown="@+id/rowSettingsPlay"
+                        android:nextFocusLeft="@+id/rowSettingsShare"
+                        android:nextFocusRight="@+id/rowSettingsShare"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_settings_share"
+                            android:tint="#FFFFFFFF" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/sf_medium"
+                            android:text="Mango Share"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <Switch
+                            android:id="@+id/switchSettingsShare"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:thumb="@drawable/bg_settings_toggle_thumb"
+                            android:track="@drawable/bg_settings_toggle_track" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="48dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="#14FFFFFF" />
+
+                    <!-- Mango Play -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingsPlay"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/bg_settings_row_item"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:nextFocusUp="@+id/rowSettingsShare"
+                        android:nextFocusDown="@+id/rowSettingsBuds"
+                        android:nextFocusLeft="@+id/rowSettingsPlay"
+                        android:nextFocusRight="@+id/rowSettingsPlay"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_settings_play"
+                            android:tint="#FFFFFFFF" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/sf_medium"
+                            android:text="Mango Play"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <Switch
+                            android:id="@+id/switchSettingsPlay"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:thumb="@drawable/bg_settings_toggle_thumb"
+                            android:track="@drawable/bg_settings_toggle_track" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="48dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="#14FFFFFF" />
+
+                    <!-- Mango Buds -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingsBuds"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/bg_settings_row_item"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:nextFocusUp="@+id/rowSettingsPlay"
+                        android:nextFocusDown="@+id/rowSettingsRemote"
+                        android:nextFocusLeft="@+id/rowSettingsBuds"
+                        android:nextFocusRight="@+id/rowSettingsBuds"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_settings_buds"
+                            android:tint="#FFFFFFFF" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/sf_medium"
+                            android:text="Mango Buds"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <Switch
+                            android:id="@+id/switchSettingsBuds"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:thumb="@drawable/bg_settings_toggle_thumb"
+                            android:track="@drawable/bg_settings_toggle_track" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="48dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="#14FFFFFF" />
+
+                    <!-- Mango Remote -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingsRemote"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/bg_settings_row_item"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:nextFocusUp="@+id/rowSettingsBuds"
+                        android:nextFocusDown="@+id/rowSettingsDisplay"
+                        android:nextFocusLeft="@+id/rowSettingsRemote"
+                        android:nextFocusRight="@+id/rowSettingsRemote"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_settings_phone"
+                            android:tint="#FFFFFFFF" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/sf_medium"
+                                android:text="Mango Remote"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="14sp" />
+
+                            <TextView
+                                android:id="@+id/textSettingsRemoteSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/sf_regular"
+                                android:text="Pair your phone"
+                                android:textColor="#FFA1A1A6"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:src="@drawable/ic_chevron_right"
+                            android:tint="#80FFFFFF" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Group 2: System Settings -->
+                <LinearLayout
+                    android:id="@+id/groupSystemSettings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_settings_group_card"
+                    android:orientation="vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp">
+
+                    <!-- Display & Sound -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingsDisplay"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/bg_settings_row_item"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:nextFocusUp="@+id/rowSettingsRemote"
+                        android:nextFocusDown="@+id/rowSettingsPrivacy"
+                        android:nextFocusLeft="@+id/rowSettingsDisplay"
+                        android:nextFocusRight="@+id/rowSettingsDisplay"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_display"
+                            android:tint="#FFFFFFFF" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/sf_medium"
+                            android:text="Display &amp; Sound"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:src="@drawable/ic_chevron_right"
+                            android:tint="#80FFFFFF" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="48dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="#14FFFFFF" />
+
+                    <!-- Privacy & Security -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingsPrivacy"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@drawable/bg_settings_row_item"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:nextFocusUp="@+id/rowSettingsDisplay"
+                        android:nextFocusDown="@+id/rowSettingsDevice"
+                        android:nextFocusLeft="@+id/rowSettingsPrivacy"
+                        android:nextFocusRight="@+id/rowSettingsPrivacy"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:src="@drawable/ic_privacy"
+                            android:tint="#FFFFFFFF" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/sf_medium"
+                            android:text="Privacy &amp; Security"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:src="@drawable/ic_chevron_right"
+                            android:tint="#80FFFFFF" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Group 3: Device Settings Card -->
+                <LinearLayout
+                    android:id="@+id/rowSettingsDevice"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_settings_tile_card"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:nextFocusUp="@+id/rowSettingsPrivacy"
+                    android:nextFocusDown="@+id/rowSettingsDevice"
+                    android:nextFocusLeft="@+id/rowSettingsDevice"
+                    android:nextFocusRight="@+id/rowSettingsDevice"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="14dp">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_settings_tune"
+                        android:tint="#FFFFFFFF" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/sf_medium"
+                        android:text="Device Settings"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="14sp" />
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_chevron_right"
+                        android:tint="#80FFFFFF" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Dynamic QR Pairing Modal (Overlaid on top when pairing phone) -->
+    <FrameLayout
+        android:id="@+id/settingsQrModal"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#D9000000"
+        android:clickable="true"
+        android:elevation="90dp"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="440dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_settings_dialog"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingStart="24dp"
+            android:paddingTop="20dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/sf_bold"
+                android:text="Pair Mango Remote"
+                android:textColor="#FFFFFFFF"
+                android:textSize="20sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:fontFamily="@font/sf_regular"
+                android:text="Scan with iPhone Camera or Android Chrome"
+                android:textColor="#FFA1A1A6"
+                android:textSize="13sp" />
+
+            <FrameLayout
+                android:layout_width="180dp"
+                android:layout_height="180dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_airpods_btn"
+                android:padding="8dp">
+
+                <ImageView
+                    android:id="@+id/settingsQrImageView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:fontFamily="@font/sf_medium"
+                android:text="OR ENTER 4-DIGIT PIN ON PHONE"
+                android:textColor="#FF8E8E93"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/settingsQrPinText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/badge_glass_bg"
+                android:fontFamily="@font/sf_bold"
+                android:letterSpacing="0.25"
+                android:paddingStart="18dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="4dp"
+                android:text="5 4 3 2"
+                android:textColor="#FFFFFFFF"
+                android:textSize="22sp" />
+
+            <TextView
+                android:id="@+id/settingsQrUrlText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="monospace"
+                android:text="http://192.168.1.3:8090"
+                android:textColor="#FFFF9500"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnSettingsQrRegenerate"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_settings_btn_secondary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/sf_medium"
+                    android:gravity="center"
+                    android:nextFocusUp="@+id/btnSettingsQrRegenerate"
+                    android:nextFocusDown="@+id/btnSettingsQrRegenerate"
+                    android:nextFocusLeft="@+id/btnSettingsQrRegenerate"
+                    android:nextFocusRight="@+id/btnSettingsQrDone"
+                    android:text="New PIN"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/btnSettingsQrDone"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_settings_btn_primary"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="@font/sf_bold"
+                    android:gravity="center"
+                    android:nextFocusUp="@+id/btnSettingsQrDone"
+                    android:nextFocusDown="@+id/btnSettingsQrDone"
+                    android:nextFocusLeft="@+id/btnSettingsQrRegenerate"
+                    android:nextFocusRight="@+id/btnSettingsQrDone"
+                    android:text="Done"
+                    android:textColor="#FF000000"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+</FrameLayout>
