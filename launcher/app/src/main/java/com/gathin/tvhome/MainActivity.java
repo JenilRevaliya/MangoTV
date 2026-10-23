@@ -6,6 +6,12 @@ import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.Dialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothProfile;
+import com.gathin.tvhome.bluetooth.AirPodsDetector;
+import com.gathin.tvhome.bluetooth.AirPodsDevice;
+import java.lang.reflect.Method;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -128,6 +134,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private ImageView homeWeatherIcon;
     private TextView homeWeatherTemp;
     private final WeatherManager.WeatherListener homeWeatherListener = this::updateHomeWeather;
+
+    // AirPods detection and Apple TV-grade HUD
+    private AirPodsDetector airPodsDetector;
+    private AirPodsDevice currentAirPodsDevice;
+    private View airPodsHud;
+    private ImageView airPodsIcon;
+    private TextView airPodsTitle;
+    private TextView airPodsStatus;
+    private TextView airPodsLeftBattery;
+    private ImageView airPodsLeftBolt;
+    private TextView airPodsCaseBattery;
+    private ImageView airPodsCaseBolt;
+    private TextView airPodsRightBattery;
+    private ImageView airPodsRightBolt;
+    private TextView airPodsBtnConnect;
+    private TextView airPodsBtnAudio;
+    private TextView airPodsBtnDismiss;
+    private View focusedAirPodsButton;
+    private View preAirPodsFocusedView;
+    private Runnable airPodsAutoDismissRunnable;
 
     private int heldNavKeyCode = 0;
     private long navHoldStartTime = 0L;
@@ -544,9 +570,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (watchNextList != null && isDescendantOf(newF, watchNextList)) return;
             if (grid != null && isDescendantOf(newF, grid)) return;
             if (dockPill != null && isDescendantOf(newF, dockPill)) return;
+            if (airPodsHud != null && isDescendantOf(newF, airPodsHud)) return;
             // Focus truly left tiles: clear tracking and fade the glass
             focusedWatchNextCard = null;
             lastFocusedTileCard = null;
+            focusedAirPodsButton = null;
             hideGlass();
         });
 
@@ -585,6 +613,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                     .build(), vpnCallback);
         }
+        initAirPodsViews();
+        initAirPodsDetector();
+
+        // Debug/test receiver for live hardware verification over ADB
+        try {
+            IntentFilter testFilter = new IntentFilter("com.gathin.tvhome.action.TEST_AIRPODS");
+            registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    AirPodsDevice mock = new AirPodsDevice("00:11:22:33:44:55");
+                    mock.modelName = "AirPods Pro";
+                    mock.modelId = 0x0E20;
+                    mock.leftBattery = 85;
+                    mock.rightBattery = 90;
+                    mock.caseBattery = 100;
+                    mock.isLeftCharging = false;
+                    mock.isRightCharging = true;
+                    mock.isCaseCharging = false;
+                    mock.lidOpen = true;
+                    showAirPodsHud(mock);
+                }
+            }, testFilter);
+        } catch (Throwable ignored) {}
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null) openLauncherSettingsIfAsked(getIntent());
     }
@@ -1051,6 +1102,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             updateWatchNextGlass(focusedWatchNextCard, spring);
         } else if (lastFocusedTileCard != null && lastFocusedTileCard.isAttachedToWindow() && lastFocusedTileCard.isFocused()) {
             updateTileGlass(lastFocusedTileCard, lastFocused, spring);
+        } else if (focusedAirPodsButton != null && focusedAirPodsButton.isAttachedToWindow() && focusedAirPodsButton.isFocused()) {
+            updateAirPodsButtonGlass(focusedAirPodsButton, spring);
         } else {
             hideGlass();
         }
@@ -1941,6 +1994,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         promptsPaused = false;
+        if (airPodsDetector != null) {
+            airPodsDetector.startScanning();
+        }
         if (rebuildOnResume) {
             tilesReady = false;
             reloadApps(true);
@@ -2068,6 +2124,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (cardPrompt != null) cardPrompt.dismiss();
         if (appLibrary != null) appLibrary.close();
         if (openPopup != null) openPopup.dismiss();
+        if (airPodsDetector != null) {
+            airPodsDetector.stopScanning();
+        }
+        dismissAirPodsHud();
     }
 
     @Override
@@ -2089,6 +2149,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (airPodsDetector != null) {
+            airPodsDetector.destroy();
+            airPodsDetector = null;
+        }
         if (soundPool != null) {
             soundPool.release();
             soundPool = null;
@@ -2266,6 +2330,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return true;
             }
             return super.dispatchKeyEvent(event);
+        }
+
+        // If AirPods HUD is visible, intercept Back key to cleanly dismiss it
+        if (airPodsHud != null && airPodsHud.getVisibility() == View.VISIBLE) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    dismissAirPodsHud();
+                }
+                return true;
+            }
         }
 
         int action = event.getAction();
@@ -3640,6 +3715,268 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return getString(R.string.card_state_new_label);
             default:
                 return getString(R.string.card_state_new);
+        }
+    }
+
+    // ---- AirPods Detection & Apple TV HUD ----------------------------------------------------
+
+    private void initAirPodsViews() {
+        airPodsHud = findViewById(R.id.airPodsHud);
+        if (airPodsHud == null) return;
+
+        airPodsIcon = findViewById(R.id.airPodsIcon);
+        airPodsTitle = findViewById(R.id.airPodsTitle);
+        airPodsStatus = findViewById(R.id.airPodsStatus);
+        airPodsLeftBattery = findViewById(R.id.airPodsLeftBattery);
+        airPodsLeftBolt = findViewById(R.id.airPodsLeftBolt);
+        airPodsCaseBattery = findViewById(R.id.airPodsCaseBattery);
+        airPodsCaseBolt = findViewById(R.id.airPodsCaseBolt);
+        airPodsRightBattery = findViewById(R.id.airPodsRightBattery);
+        airPodsRightBolt = findViewById(R.id.airPodsRightBolt);
+
+        airPodsBtnConnect = findViewById(R.id.airPodsBtnConnect);
+        airPodsBtnAudio = findViewById(R.id.airPodsBtnAudio);
+        airPodsBtnDismiss = findViewById(R.id.airPodsBtnDismiss);
+
+        View.OnFocusChangeListener btnFocusListener = (v, focused) -> {
+            if (focused) {
+                updateAirPodsButtonGlass(v, true);
+            }
+        };
+
+        if (airPodsBtnConnect != null) {
+            airPodsBtnConnect.setOnFocusChangeListener(btnFocusListener);
+            airPodsBtnConnect.setOnClickListener(v -> connectAirPods(currentAirPodsDevice));
+        }
+        if (airPodsBtnAudio != null) {
+            airPodsBtnAudio.setOnFocusChangeListener(btnFocusListener);
+            airPodsBtnAudio.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+                } catch (Exception e) {
+                    try {
+                        startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"));
+                    } catch (Exception ignored) {}
+                }
+                dismissAirPodsHud();
+            });
+        }
+        if (airPodsBtnDismiss != null) {
+            airPodsBtnDismiss.setOnFocusChangeListener(btnFocusListener);
+            airPodsBtnDismiss.setOnClickListener(v -> dismissAirPodsHud());
+        }
+    }
+
+    private void initAirPodsDetector() {
+        try {
+            airPodsDetector = new AirPodsDetector(this);
+            airPodsDetector.setListener(new AirPodsDetector.Listener() {
+                @Override
+                public void onAirPodsLidOpened(AirPodsDevice device) {
+                    showAirPodsHud(device);
+                }
+
+                @Override
+                public void onAirPodsStatusUpdated(AirPodsDevice device) {
+                    if (airPodsHud != null && airPodsHud.getVisibility() == View.VISIBLE) {
+                        updateAirPodsHudData(device);
+                    }
+                }
+
+                @Override
+                public void onAirPodsLidClosed(AirPodsDevice device) {
+                    dismissAirPodsHud();
+                }
+            });
+        } catch (Throwable t) {
+            Log.w("MainActivity", "AirPods detector init failed", t);
+        }
+    }
+
+    private void showAirPodsHud(AirPodsDevice device) {
+        if (airPodsHud == null || device == null) return;
+        currentAirPodsDevice = device;
+        updateAirPodsHudData(device);
+
+        if (airPodsHud.getVisibility() != View.VISIBLE) {
+            airPodsHud.setVisibility(View.VISIBLE);
+            airPodsHud.setAlpha(0f);
+            airPodsHud.setTranslationY(-24f * density);
+            airPodsHud.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(260)
+                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .start();
+
+            preAirPodsFocusedView = getCurrentFocus();
+            if (airPodsBtnConnect != null) {
+                airPodsBtnConnect.post(() -> {
+                    airPodsBtnConnect.requestFocus();
+                    updateAirPodsButtonGlass(airPodsBtnConnect, true);
+                });
+            }
+        }
+
+        if (airPodsAutoDismissRunnable != null) {
+            handler.removeCallbacks(airPodsAutoDismissRunnable);
+        }
+        airPodsAutoDismissRunnable = this::dismissAirPodsHud;
+        handler.postDelayed(airPodsAutoDismissRunnable, 12000L);
+    }
+
+    private void updateAirPodsHudData(AirPodsDevice device) {
+        if (device == null) return;
+        if (airPodsTitle != null) airPodsTitle.setText(device.modelName);
+        if (airPodsStatus != null) {
+            airPodsStatus.setText(device.lidOpen ? "Lid Open • Nearby" : "In Range");
+        }
+
+        if (airPodsLeftBattery != null) {
+            airPodsLeftBattery.setText(device.leftBattery >= 0 ? (device.leftBattery + "%") : "--%");
+        }
+        if (airPodsLeftBolt != null) {
+            airPodsLeftBolt.setVisibility(device.isLeftCharging ? View.VISIBLE : View.GONE);
+        }
+
+        if (airPodsCaseBattery != null) {
+            airPodsCaseBattery.setText(device.caseBattery >= 0 ? (device.caseBattery + "%") : "--%");
+        }
+        if (airPodsCaseBolt != null) {
+            airPodsCaseBolt.setVisibility(device.isCaseCharging ? View.VISIBLE : View.GONE);
+        }
+
+        if (airPodsRightBattery != null) {
+            airPodsRightBattery.setText(device.rightBattery >= 0 ? (device.rightBattery + "%") : "--%");
+        }
+        if (airPodsRightBolt != null) {
+            airPodsRightBolt.setVisibility(device.isRightCharging ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void dismissAirPodsHud() {
+        if (airPodsHud == null || airPodsHud.getVisibility() != View.VISIBLE) return;
+        if (airPodsAutoDismissRunnable != null) {
+            handler.removeCallbacks(airPodsAutoDismissRunnable);
+            airPodsAutoDismissRunnable = null;
+        }
+
+        airPodsHud.animate()
+                .alpha(0f)
+                .translationY(-20f * density)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .withEndAction(() -> {
+                    airPodsHud.setVisibility(View.GONE);
+                    focusedAirPodsButton = null;
+                    if (preAirPodsFocusedView != null && preAirPodsFocusedView.isAttachedToWindow()) {
+                        preAirPodsFocusedView.requestFocus();
+                        updateCurrentFocusGlass(true);
+                    } else if (dockPill != null) {
+                        View dockTile = getFocusedDockTile();
+                        if (dockTile != null) {
+                            dockTile.requestFocus();
+                            updateDockGlass(dockTile, true);
+                        }
+                    }
+                })
+                .start();
+    }
+
+    private void updateAirPodsButtonGlass(View button, boolean spring) {
+        if (button == null || root == null || glass == null || !button.isAttachedToWindow() || !button.isFocused()) {
+            return;
+        }
+        // User is actively navigating the AirPods HUD: extend auto-dismiss timer
+        if (airPodsAutoDismissRunnable != null) {
+            handler.removeCallbacks(airPodsAutoDismissRunnable);
+            handler.postDelayed(airPodsAutoDismissRunnable, 15000L);
+        }
+        focusedAirPodsButton = button;
+        float w = button.getWidth();
+        float h = button.getHeight();
+        float radius = 14f * density;
+        int accent = 0;
+        if (spring) {
+            glideGlassTo(button, w, h, 1.0f, radius, accent, false);
+        } else {
+            snapGlassTo(button, w, h, 1.0f, radius, accent, false);
+        }
+    }
+
+    private void connectAirPods(AirPodsDevice airPods) {
+        if (airPods == null) return;
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null || !adapter.isEnabled()) {
+            try {
+                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+            } catch (Exception ignored) {}
+            return;
+        }
+
+        BluetoothDevice targetDev = null;
+        try {
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded != null) {
+                for (BluetoothDevice dev : bonded) {
+                    if (dev.getAddress() != null && dev.getAddress().equalsIgnoreCase(airPods.address)) {
+                        targetDev = dev;
+                        break;
+                    }
+                }
+                if (targetDev == null) {
+                    for (BluetoothDevice dev : bonded) {
+                        String name = dev.getName();
+                        if (name != null && name.toLowerCase().contains("airpods")) {
+                            targetDev = dev;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (SecurityException ignored) {}
+
+        if (targetDev != null) {
+            final BluetoothDevice devToConnect = targetDev;
+            if (airPodsBtnConnect != null) {
+                airPodsBtnConnect.setText("Connecting...");
+            }
+            adapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
+                @Override
+                public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    if (profile == BluetoothProfile.A2DP) {
+                        try {
+                            Method connectMethod = proxy.getClass().getMethod("connect", BluetoothDevice.class);
+                            connectMethod.invoke(proxy, devToConnect);
+                            if (airPodsBtnConnect != null) {
+                                airPodsBtnConnect.setText("Connected");
+                            }
+                        } catch (Exception e) {
+                            try {
+                                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+                            } catch (Exception ignored) {}
+                        }
+                        handler.postDelayed(() -> {
+                            try {
+                                adapter.closeProfileProxy(BluetoothProfile.A2DP, proxy);
+                            } catch (Exception ignored) {}
+                            dismissAirPodsHud();
+                        }, 1200L);
+                    }
+                }
+
+                @Override
+                public void onServiceDisconnected(int profile) {}
+            }, BluetoothProfile.A2DP);
+        } else {
+            try {
+                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+            } catch (Exception e) {
+                try {
+                    startActivity(new Intent("android.settings.BLUETOOTH_SETTINGS"));
+                } catch (Exception ignored) {}
+            }
+            dismissAirPodsHud();
         }
     }
 }

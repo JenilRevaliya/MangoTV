@@ -454,6 +454,9 @@
         android:elevation="15dp"
         android:importantForAccessibility="no" />
 
+    <!-- Apple TV-style AirPods HUD card overlay -->
+    <include layout="@layout/view_airpods_hud" />
+
     <!-- The single floating glass highlight that springs between tiles. -->
     <com.gathin.tvhome.GlassView
         android:id="@+id/glass"

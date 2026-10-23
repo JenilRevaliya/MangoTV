@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/airPodsHud"
+    android:layout_width="380dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top|end"
+    android:layout_marginTop="28dp"
+    android:layout_marginEnd="36dp"
+    android:background="@drawable/bg_airpods_card"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:elevation="25dp"
+    android:orientation="vertical"
+    android:padding="18dp"
+    android:visibility="gone">
+
+    <!-- Top Header: Icon, Name, and Status -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/airPodsIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="AirPods"
+            android:src="@drawable/ic_airpods" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/airPodsTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="AirPods Pro"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/airPodsStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:fontFamily="sans-serif"
+                android:text="Lid Open • Nearby"
+                android:textColor="#FF98989D"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <View
+            android:id="@+id/airPodsLidDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/status_dot" />
+    </LinearLayout>
+
+    <!-- Hairline Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="#1AFFFFFF" />
+
+    <!-- Battery Row (Left, Case, Right) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <!-- Left Earbud -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/airPodsLeftIcon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="Left Earbud"
+                android:src="@drawable/ic_airpods_bud_left" />
+
+            <TextView
+                android:id="@+id/airPodsLeftBattery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="--%"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:id="@+id/airPodsLeftBolt"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="2dp"
+                android:contentDescription="Charging"
+                android:src="@drawable/ic_battery_bolt"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="•"
+            android:textColor="#3A3A3C" />
+
+        <!-- Case -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/airPodsCaseIcon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="Case"
+                android:src="@drawable/ic_airpods_case" />
+
+            <TextView
+                android:id="@+id/airPodsCaseBattery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="--%"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:id="@+id/airPodsCaseBolt"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="2dp"
+                android:contentDescription="Charging"
+                android:src="@drawable/ic_battery_bolt"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="•"
+            android:textColor="#3A3A3C" />
+
+        <!-- Right Earbud -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/airPodsRightIcon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="Right Earbud"
+                android:src="@drawable/ic_airpods_bud_right" />
+
+            <TextView
+                android:id="@+id/airPodsRightBattery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="--%"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:id="@+id/airPodsRightBolt"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="2dp"
+                android:contentDescription="Charging"
+                android:src="@drawable/ic_battery_bolt"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Action Buttons with CW Glass Slider Navigation -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/airPodsBtnConnect"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_airpods_btn"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusRight="@+id/airPodsBtnAudio"
+            android:text="Connect"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/airPodsBtnAudio"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_airpods_btn"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusLeft="@+id/airPodsBtnConnect"
+            android:nextFocusRight="@+id/airPodsBtnDismiss"
+            android:text="Audio"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/airPodsBtnDismiss"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_airpods_btn"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusLeft="@+id/airPodsBtnAudio"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="Done"
+            android:textColor="#FF98989D"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

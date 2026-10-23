@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- AirPods Pro Case / Buds vector outline -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.5,4C5.57,4 4,5.57 4,7.5c0,1.26 0.67,2.36 1.67,2.98L4.62,17.4c-0.1,0.68 0.38,1.31 1.06,1.41 0.68,0.1 1.31,-0.38 1.41,-1.06L8.13,10.7C8.75,10.9 9.36,11 10,11c1.93,0 3.5,-1.57 3.5,-3.5C13.5,5.57 11.93,4 10,4H7.5zm0,2H10c0.83,0 1.5,0.67 1.5,1.5S10.83,9 10,9H7.5C6.67,9 6,8.33 6,7.5S6.67,6 7.5,6z"/>
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.5,4C14.57,4 13,5.57 13,7.5c0,1.26 0.67,2.36 1.67,2.98L13.62,17.4c-0.1,0.68 0.38,1.31 1.06,1.41 0.68,0.1 1.31,-0.38 1.41,-1.06L17.13,10.7c0.62,0.2 1.23,0.3 1.87,0.3 1.93,0 3.5,-1.57 3.5,-3.5C22.5,5.57 20.93,4 19,4h-2.5zm0,2H19c0.83,0 1.5,0.67 1.5,1.5S19.83,9 19,9h-2.5c-0.83,0 -1.5,-0.67 -1.5,-1.5S15.67,6 16.5,6z"/>
+</vector>
