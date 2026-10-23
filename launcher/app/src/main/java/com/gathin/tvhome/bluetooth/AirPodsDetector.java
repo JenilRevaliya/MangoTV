@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AirPodsDetector {
     private static final String TAG = "AirPodsDetector";
     private static final int APPLE_COMPANY_ID = 76; // 0x004C
-    private static final int PROXIMITY_RSSI_THRESHOLD = -75; // Living room proximity threshold
+    private static final int PROXIMITY_RSSI_THRESHOLD = -82; // Living room proximity threshold
     private static final long LID_CLOSE_TIMEOUT_MS = 3500L;
 
     public interface Listener {
@@ -123,12 +123,8 @@ public class AirPodsDetector {
             }
 
             // Hardware filter: match Apple Inc (76) manufacturer data prefix [0x07, 0x19]
-            byte[] manufacturerData = new byte[27];
-            byte[] manufacturerDataMask = new byte[27];
-            manufacturerData[0] = 0x07;
-            manufacturerData[1] = 0x19;
-            manufacturerDataMask[0] = (byte) 0xFF;
-            manufacturerDataMask[1] = (byte) 0xFF;
+            byte[] manufacturerData = new byte[]{ 0x07, 0x19 };
+            byte[] manufacturerDataMask = new byte[]{ (byte) 0xFF, (byte) 0xFF };
 
             ScanFilter filter = new ScanFilter.Builder()
                     .setManufacturerData(APPLE_COMPANY_ID, manufacturerData, manufacturerDataMask)
