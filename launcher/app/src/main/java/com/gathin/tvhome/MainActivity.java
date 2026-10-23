@@ -15,6 +15,11 @@ import com.gathin.tvhome.share.MangoShareServer;
 import com.gathin.tvhome.airplay.MangoAirPlayManager;
 import com.gathin.tvhome.connectivity.MangoConnectivityCoordinator;
 import com.gathin.tvhome.connectivity.PlayHandoffRequest;
+import com.gathin.tvhome.remote.MangoRemoteKeyInjector;
+import com.gathin.tvhome.remote.MangoRemotePairingManager;
+import com.gathin.tvhome.remote.MangoRemoteProtocol;
+import com.gathin.tvhome.remote.MangoRemoteServer;
+import org.json.JSONObject;
 import android.widget.ProgressBar;
 import java.lang.reflect.Method;
 import android.content.ActivityNotFoundException;
@@ -144,6 +149,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     // Mango TV Unified Connectivity Coordinator
     private MangoConnectivityCoordinator connectivityCoordinator;
     private long lastCooldownsClearedTime = 0L;
+
+    // Mango Remote Server & Pairing
+    private MangoRemoteServer mangoRemoteServer;
+    private MangoRemotePairingManager remotePairingManager;
+    private MangoRemoteKeyInjector remoteKeyInjector;
 
     // AirPods detection and Apple TV-grade HUD
     private AirPodsDetector airPodsDetector;
@@ -662,6 +672,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             testFilter.addAction("com.gathin.tvhome.action.TEST_AIRPLAY");
             testFilter.addAction("com.gathin.tvhome.action.TEST_PLAY");
             testFilter.addAction("com.gathin.tvhome.action.TEST_PILL");
+            testFilter.addAction("com.gathin.tvhome.action.START_REMOTE_PAIRING");
+            testFilter.addAction("com.gathin.tvhome.action.TEST_REMOTE_PAIRING");
             registerReceiver(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
@@ -716,6 +728,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         if (connectivityCoordinator != null) {
                             connectivityCoordinator.showStatusPill("Mango Buds", "Tap to connect", R.drawable.ic_airpods);
                         }
+                    } else if ("com.gathin.tvhome.action.START_REMOTE_PAIRING".equals(action) ||
+                            "com.gathin.tvhome.action.TEST_REMOTE_PAIRING".equals(action)) {
+                        startMangoRemotePairing();
                     }
                 }
             }, testFilter);
@@ -2247,6 +2262,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mangoAirPlayManager.stop();
             mangoAirPlayManager = null;
         }
+        stopMangoRemote();
         if (soundPool != null) {
             soundPool.release();
             soundPool = null;
@@ -4263,6 +4279,86 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } else if (budsEnabled && airPodsDetector != null) {
             airPodsDetector.startScanning();
         }
+
+        boolean remoteEnabled = prefs.getBoolean("mango_remote_enabled", true);
+        if (remoteEnabled && mangoRemoteServer == null) {
+            startMangoRemote();
+        } else if (!remoteEnabled && mangoRemoteServer != null) {
+            stopMangoRemote();
+        }
+    }
+
+    private void startMangoRemote() {
+        try {
+            if (remotePairingManager == null) {
+                remotePairingManager = new MangoRemotePairingManager(this);
+            }
+            if (remoteKeyInjector == null) {
+                remoteKeyInjector = new MangoRemoteKeyInjector(this);
+                remoteKeyInjector.setDirectReceiver(new MangoRemoteKeyInjector.RemoteKeyReceiver() {
+                    @Override
+                    public boolean onDirectKeyEvent(int keyCode) {
+                        return dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                                && dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
+                    }
+
+                    @Override
+                    public void onDirectTextEntered(String text) {
+                        // Direct text entered
+                    }
+                });
+            }
+            mangoRemoteServer = new MangoRemoteServer(this, MangoRemoteProtocol.DEFAULT_PORT, remotePairingManager, remoteKeyInjector);
+            mangoRemoteServer.setListener(new MangoRemoteServer.RemoteServerListener() {
+                @Override
+                public void onServerStarted(int port, String localIp) {
+                    Log.i("MainActivity", "Mango Remote server listening on " + localIp + ":" + port);
+                }
+
+                @Override
+                public void onClientConnected(String clientIp) {
+                    runOnUiThread(() -> {
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showStatusPill("Mango Remote", "Phone connected", R.drawable.ic_airplay);
+                        }
+                    });
+                }
+
+                @Override
+                public void onClientDisconnected(String clientIp) {
+                    // Handled gracefully
+                }
+
+                @Override
+                public void onCommandReceived(String action, JSONObject payload) {
+                    // Handled
+                }
+            });
+            mangoRemoteServer.start();
+        } catch (Throwable t) {
+            Log.e("MainActivity", "Error starting Mango Remote server", t);
+        }
+    }
+
+    private void stopMangoRemote() {
+        if (mangoRemoteServer != null) {
+            mangoRemoteServer.stop();
+            mangoRemoteServer = null;
+        }
+    }
+
+    public void startMangoRemotePairing() {
+        runOnUiThread(() -> {
+            if (remotePairingManager == null) {
+                remotePairingManager = new MangoRemotePairingManager(this);
+            }
+            String pin = remotePairingManager.startPairingSession();
+            String localIp = mangoRemoteServer != null ? mangoRemoteServer.getLocalIpAddress() : "127.0.0.1";
+            String url = "http://" + localIp + ":" + MangoRemoteProtocol.DEFAULT_PORT;
+            if (connectivityCoordinator != null) {
+                connectivityCoordinator.showRemotePairingPrompt(pin, url, null);
+            }
+        });
     }
 
     private void startMangoShare() {
@@ -4513,6 +4609,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mangoAirPlayManager.stop();
             mangoAirPlayManager = null;
         }
+        stopMangoRemote();
         dismissAirPlayHud();
         if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
     }

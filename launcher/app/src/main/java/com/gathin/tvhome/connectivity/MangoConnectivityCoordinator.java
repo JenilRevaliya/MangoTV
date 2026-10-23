@@ -37,6 +37,7 @@ public class MangoConnectivityCoordinator {
     public static final int PRIORITY_BUDS = 2;
     public static final int PRIORITY_PLAY = 3;
     public static final int PRIORITY_SHARE_PROMPT = 4;
+    public static final int PRIORITY_REMOTE_PAIRING = 4;
     public static final int PRIORITY_TRANSFER_ACTIVE = 5;
 
     private static final long PROMPT_TIMEOUT_MS = 30000L;
@@ -94,6 +95,11 @@ public class MangoConnectivityCoordinator {
     private ProgressBar playProgressBar;
     private TextView playTimeElapsed;
     private TextView playTimeTotal;
+
+    // Panel 4: Remote Pairing Views
+    private View panelRemote;
+    private TextView remotePinText;
+    private TextView remoteUrlText;
 
     // Buttons
     private View buttonsRow;
@@ -162,6 +168,11 @@ public class MangoConnectivityCoordinator {
             playProgressBar = overlayRoot.findViewById(R.id.playProgressBar);
             playTimeElapsed = overlayRoot.findViewById(R.id.playTimeElapsed);
             playTimeTotal = overlayRoot.findViewById(R.id.playTimeTotal);
+
+            // Panel 4: Remote
+            panelRemote = overlayRoot.findViewById(R.id.panelRemote);
+            remotePinText = overlayRoot.findViewById(R.id.remotePinText);
+            remoteUrlText = overlayRoot.findViewById(R.id.remoteUrlText);
 
             buttonsRow = overlayRoot.findViewById(R.id.connectivityButtonsRow);
             btnPrimary = overlayRoot.findViewById(R.id.btnConnectivityPrimary);
@@ -430,6 +441,10 @@ public class MangoConnectivityCoordinator {
     // ---- Top-Right Compact Status Pill -----------------------------------------------------------
 
     public void showStatusPill(String title, String subtitle, int iconRes) {
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            handler.post(() -> showStatusPill(title, subtitle, iconRes));
+            return;
+        }
         if (isDialogVisible()) return; // Never show status pill when full dialog is active
         if (statusPill == null) return;
 
@@ -606,10 +621,56 @@ public class MangoConnectivityCoordinator {
         }
     }
 
+    public void showRemotePairingPrompt(String pin, String connectUrl, Runnable onDismiss) {
+        if (overlayRoot == null || panelRemote == null) return;
+        if (currentPriority > PRIORITY_REMOTE_PAIRING) return;
+
+        currentPriority = PRIORITY_REMOTE_PAIRING;
+        prepareOverlayPresentation();
+
+        if (badgeIcon != null) {
+            badgeIcon.setImageResource(R.drawable.ic_airplay);
+            badgeIcon.setBackgroundResource(R.drawable.bg_badge_orange);
+        }
+        if (titleView != null) titleView.setText("Mango Remote");
+        if (subtitleView != null) subtitleView.setText("Pair companion web remote");
+
+        showOnlyPanel(panelRemote);
+
+        if (remotePinText != null && pin != null) {
+            StringBuilder formatted = new StringBuilder();
+            for (int i = 0; i < pin.length(); i++) {
+                if (i > 0) formatted.append(" ");
+                formatted.append(pin.charAt(i));
+            }
+            remotePinText.setText(formatted.toString());
+        }
+        if (remoteUrlText != null) {
+            remoteUrlText.setText(connectUrl);
+        }
+
+        if (btnPrimary != null) {
+            btnPrimary.setText("Done");
+            btnPrimary.setVisibility(View.VISIBLE);
+            btnPrimary.setOnClickListener(v -> {
+                dismissDialog();
+                if (onDismiss != null) onDismiss.run();
+            });
+            btnPrimary.requestFocus();
+        }
+        if (btnSecondary != null) {
+            btnSecondary.setVisibility(View.GONE);
+        }
+
+        animateInCard();
+    }
+
     private void showOnlyPanel(View target) {
         if (panelBuds != null) panelBuds.setVisibility(target == panelBuds ? View.VISIBLE : View.GONE);
         if (panelShare != null) panelShare.setVisibility(target == panelShare ? View.VISIBLE : View.GONE);
         if (panelPlay != null) panelPlay.setVisibility(target == panelPlay ? View.VISIBLE : View.GONE);
+        if (panelRemote != null) panelRemote.setVisibility(target == panelRemote ? View.VISIBLE : View.GONE);
+        if (btnSecondary != null && target != panelRemote) btnSecondary.setVisibility(View.VISIBLE);
     }
 
     private void cancelAutoDismiss() {

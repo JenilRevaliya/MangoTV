@@ -24,6 +24,8 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView mangoPlayChoice;
     private TextView mangoPromptsChoice;
     private TextView clearCooldownsChoice;
+    private TextView mangoRemoteChoice;
+    private TextView pairRemoteChoice;
     private int columns;
     private boolean animations;
     private boolean advancedEffects;
@@ -32,6 +34,7 @@ public final class LauncherSettingsActivity extends Activity {
     private boolean mangoBuds;
     private boolean mangoPlay;
     private boolean mangoPrompts;
+    private boolean mangoRemote;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -47,6 +50,7 @@ public final class LauncherSettingsActivity extends Activity {
         mangoBuds = choices.getBoolean("mango_buds_enabled", true);
         mangoPlay = choices.getBoolean("mango_play_enabled", true);
         mangoPrompts = choices.getBoolean("mango_prompts_enabled", true);
+        mangoRemote = choices.getBoolean("mango_remote_enabled", true);
 
         int[] ids = {R.id.columns4, R.id.columns5, R.id.columns6, R.id.columns7};
         for (int i = 0; i < ids.length; i++) {
@@ -154,6 +158,20 @@ public final class LauncherSettingsActivity extends Activity {
             setResult(RESULT_OK);
         });
 
+        mangoRemoteChoice = findViewById(R.id.mangoRemoteChoice);
+        mangoRemoteChoice.setOnClickListener(v -> {
+            mangoRemote = !mangoRemote;
+            choices.edit().putBoolean("mango_remote_enabled", mangoRemote).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+
+        pairRemoteChoice = findViewById(R.id.pairRemoteChoice);
+        pairRemoteChoice.setOnClickListener(v -> {
+            sendBroadcast(new Intent("com.gathin.tvhome.action.START_REMOTE_PAIRING"));
+            finish();
+        });
+
         refresh();
         columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
     }
@@ -195,6 +213,10 @@ public final class LauncherSettingsActivity extends Activity {
         if (mangoPromptsChoice != null) {
             mangoPromptsChoice.setText("System Pop-ups: " + (mangoPrompts ? "Enabled" : "Disabled"));
             mangoPromptsChoice.setSelected(mangoPrompts);
+        }
+        if (mangoRemoteChoice != null) {
+            mangoRemoteChoice.setText("Mango Remote Server: " + (mangoRemote ? getString(R.string.on) : getString(R.string.off)));
+            mangoRemoteChoice.setSelected(mangoRemote);
         }
     }
 

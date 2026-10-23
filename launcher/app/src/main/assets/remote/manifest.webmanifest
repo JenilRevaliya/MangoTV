@@ -1,0 +1,20 @@
+{
+  "name": "Mango Remote",
+  "short_name": "Mango Remote",
+  "description": "Premium Apple TV-grade Companion Remote for Mango TV",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0D0D11",
+  "theme_color": "#0D0D11",
+  "categories": ["utilities", "entertainment"],
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

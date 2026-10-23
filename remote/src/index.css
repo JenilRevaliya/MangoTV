@@ -1,0 +1,666 @@
+/* Mango Remote Apple-grade PWA Style Sheet */
+:root {
+  --bg-primary: #0A0A0C;
+  --bg-surface: rgba(255, 255, 255, 0.07);
+  --bg-surface-elevated: rgba(255, 255, 255, 0.12);
+  --bg-surface-active: rgba(255, 255, 255, 0.20);
+  
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-active: rgba(255, 255, 255, 0.24);
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.60);
+  --text-tertiary: rgba(255, 255, 255, 0.35);
+
+  --accent-mango: #FF9500;
+  --accent-mango-glow: rgba(255, 149, 0, 0.25);
+  
+  --status-connected: #34C759;
+  --status-connecting: #FFCC00;
+  --status-disconnected: #FF3B30;
+
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden !important;
+  position: fixed;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* App Container - Zero Scroll Constraint */
+.remote-app {
+  width: 100%;
+  max-width: 440px;
+  height: 100%;
+  max-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding-top: max(10px, var(--sat));
+  padding-bottom: max(10px, var(--sab));
+  padding-left: max(16px, var(--sal));
+  padding-right: max(16px, var(--sar));
+  overflow: hidden !important;
+  position: relative;
+  justify-content: space-between;
+}
+
+/* Header */
+.remote-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.status-badge:active {
+  background: var(--bg-surface-elevated);
+  transform: scale(0.96);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.status-dot.connected {
+  background-color: var(--status-connected);
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.6);
+}
+
+.status-dot.connecting {
+  background-color: var(--status-connecting);
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+.status-dot.disconnected {
+  background-color: var(--status-disconnected);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.header-icon-btn:active {
+  background: var(--bg-surface-elevated);
+  transform: scale(0.92);
+}
+
+/* Mode Selector */
+.mode-selector {
+  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 3px;
+  margin: 6px 0;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+}
+
+.mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mode-tab.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Main Control Area */
+.main-control-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  min-height: 0;
+  padding: 4px 0;
+}
+
+/* Buttons Remote */
+.buttons-mode-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  height: 100%;
+  gap: clamp(8px, 2vh, 18px);
+}
+
+/* D-Pad Circular Cluster */
+.dpad-cluster {
+  position: relative;
+  width: clamp(210px, 48vw, 250px);
+  height: clamp(210px, 48vw, 250px);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.dpad-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.dpad-btn:active {
+  color: var(--text-primary);
+  transform: scale(0.92);
+}
+
+.dpad-btn.up {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68px;
+  height: 52px;
+}
+.dpad-btn.up:active {
+  transform: translateX(-50%) scale(0.92);
+}
+
+.dpad-btn.down {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68px;
+  height: 52px;
+}
+.dpad-btn.down:active {
+  transform: translateX(-50%) scale(0.92);
+}
+
+.dpad-btn.left {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 68px;
+}
+.dpad-btn.left:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+.dpad-btn.right {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 68px;
+}
+.dpad-btn.right:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+.dpad-center-ok {
+  width: clamp(74px, 18vw, 88px);
+  height: clamp(74px, 18vw, 88px);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.dpad-center-ok:active {
+  background: var(--bg-surface-active);
+  transform: scale(0.93);
+}
+
+/* Navigation Utilities Row */
+.nav-utils-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 320px;
+  gap: 12px;
+}
+
+.nav-pill-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.nav-pill-btn:active {
+  background: var(--bg-surface-elevated);
+  transform: scale(0.94);
+}
+
+/* Control Bars Row: Media & Volume */
+.control-bars-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.media-bar {
+  flex: 1.1;
+  height: 50px;
+  border-radius: 25px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 4px;
+}
+
+.media-btn {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.media-btn:active {
+  color: var(--text-primary);
+  transform: scale(0.90);
+}
+
+.media-btn.play-pause {
+  color: var(--text-primary);
+}
+
+.volume-bar {
+  flex: 0.9;
+  height: 50px;
+  border-radius: 25px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 4px;
+}
+
+.volume-btn {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.volume-btn:active {
+  color: var(--text-primary);
+  transform: scale(0.90);
+}
+
+/* Swipe Remote Container */
+.swipe-mode-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.touchpad-surface {
+  flex: 1;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  touch-action: none;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s ease;
+}
+
+.touchpad-surface.touch-active {
+  border-color: rgba(255, 149, 0, 0.4);
+}
+
+.touchpad-guide-up { position: absolute; top: 16px; opacity: 0.25; }
+.touchpad-guide-down { position: absolute; bottom: 16px; opacity: 0.25; }
+.touchpad-guide-left { position: absolute; left: 16px; opacity: 0.25; }
+.touchpad-guide-right { position: absolute; right: 16px; opacity: 0.25; }
+
+.touchpad-center-hint {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  text-align: center;
+}
+
+/* App Dock - 2x2 Grid */
+.app-dock-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.app-tile {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.app-tile:active {
+  background: var(--bg-surface-elevated);
+  transform: scale(0.93);
+}
+
+.app-tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-tile-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: -0.2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90%;
+}
+
+/* Modal Sheets */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 440px;
+  background: #141418;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border-top: 1px solid var(--border-active);
+  padding: 20px;
+  padding-bottom: max(24px, var(--sab));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface-elevated);
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.modal-close-btn:active {
+  transform: scale(0.92);
+}
+
+/* Inputs & Form Elements */
+.input-text {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 16px;
+  padding: 0 14px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.input-text:focus {
+  border-color: var(--accent-mango);
+}
+
+.primary-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--accent-mango);
+  border: none;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.primary-btn:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+/* PIN Input Boxes */
+.pin-input-container {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.pin-digit-box {
+  width: 54px;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.pin-digit-box.active {
+  border-color: var(--accent-mango);
+  box-shadow: 0 0 12px var(--accent-mango-glow);
+}
+
+/* Voice Wave Animation */
+.voice-wave-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 90px;
+  gap: 6px;
+}
+
+.voice-wave-bar {
+  width: 5px;
+  height: 24px;
+  border-radius: 3px;
+  background: var(--accent-mango);
+  animation: voiceBar 0.8s infinite ease-in-out alternate;
+}
+
+.voice-wave-bar:nth-child(2) { animation-delay: 0.15s; height: 42px; }
+.voice-wave-bar:nth-child(3) { animation-delay: 0.3s; height: 60px; }
+.voice-wave-bar:nth-child(4) { animation-delay: 0.45s; height: 38px; }
+.voice-wave-bar:nth-child(5) { animation-delay: 0.2s; height: 20px; }
+
+@keyframes voiceBar {
+  0% { transform: scaleY(0.4); opacity: 0.5; }
+  100% { transform: scaleY(1.3); opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
