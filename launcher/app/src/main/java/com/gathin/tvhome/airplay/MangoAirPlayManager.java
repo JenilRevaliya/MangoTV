@@ -79,7 +79,6 @@ public class MangoAirPlayManager {
     private ExecutorService threadPool;
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener airplayRegListener;
-    private NsdManager.RegistrationListener raopRegListener;
     private WifiManager.MulticastLock multicastLock;
     private BluetoothLeAdvertiser bleAdvertiser;
     private AdvertiseCallback bleAdvertiseCallback;
@@ -226,7 +225,7 @@ public class MangoAirPlayManager {
                 String clientIp = (socket.getInetAddress() != null) ? socket.getInetAddress().getHostAddress() : "unknown";
                 String cseq = headers.get("cseq");
 
-                Log.i(TAG, "AirPlay RX: " + method + " " + uri + " (CSeq=" + cseq + ") from " + clientIp);
+                Log.i(TAG, "AirPlay RX: " + method + " " + uri + " (CSeq=" + cseq + ") headers=" + headers + " from " + clientIp);
 
                 if ("OPTIONS".equals(method)) {
                     handleOptions(out, protocol, cseq);
@@ -318,7 +317,7 @@ public class MangoAirPlayManager {
                 "<plist version=\"1.0\">\n" +
                 "<dict>\n" +
                 "<key>deviceid</key>\n<string>" + hardwareMac + "</string>\n" +
-                "<key>features</key>\n<integer>10811</integer>\n" +
+                "<key>features</key>\n<integer>8251</integer>\n" +
                 "<key>model</key>\n<string>AppleTV3,2</string>\n" +
                 "<key>name</key>\n<string>" + serverName + "</string>\n" +
                 "<key>protovers</key>\n<string>1.1</string>\n" +
@@ -391,6 +390,7 @@ public class MangoAirPlayManager {
         if (contentLength > 0 && contentLength < 1024 * 1024) {
             byte[] bytes = readExactBytes(in, (int) contentLength);
             body = new String(bytes, StandardCharsets.UTF_8);
+            Log.i(TAG, "AirPlay play body: " + body);
         }
 
         String videoUrl = null;
@@ -525,7 +525,7 @@ public class MangoAirPlayManager {
             airplayInfo.setServiceType("_airplay._tcp");
             airplayInfo.setPort(AIRPLAY_PORT);
             airplayInfo.setAttribute("model", "AppleTV3,2");
-            airplayInfo.setAttribute("features", "0x2A3B,0x0");
+            airplayInfo.setAttribute("features", "0x203B,0x0");
             airplayInfo.setAttribute("srcvers", "377.17.246");
             airplayInfo.setAttribute("flags", "0x0");
             airplayInfo.setAttribute("protovers", "1.1");
@@ -545,40 +545,6 @@ public class MangoAirPlayManager {
                 @Override public void onServiceUnregistered(NsdServiceInfo serviceInfo) {}
             };
             nsdManager.registerService(airplayInfo, NsdManager.PROTOCOL_DNS_SD, airplayRegListener);
-
-            // 2. AirTunes / RAOP audio service (_raop._tcp)
-            // Service name format: <MAC_NO_COLONS>@<ServerName>
-            NsdServiceInfo raopInfo = new NsdServiceInfo();
-            String raopName = hardwareMac.replace(":", "") + "@" + serverName;
-            raopInfo.setServiceName(raopName);
-            raopInfo.setServiceType("_raop._tcp");
-            raopInfo.setPort(AIRPLAY_PORT);
-            raopInfo.setAttribute("txtvers", "1");
-            raopInfo.setAttribute("ch", "2");
-            raopInfo.setAttribute("cn", "0,1,2,3");
-            raopInfo.setAttribute("da", "true");
-            raopInfo.setAttribute("et", "0");
-            raopInfo.setAttribute("ft", "0x2A3B,0x0");
-            raopInfo.setAttribute("sf", "0x0");
-            raopInfo.setAttribute("md", "0,1,2");
-            raopInfo.setAttribute("am", "AppleTV3,2");
-            raopInfo.setAttribute("pk", publicKey);
-            raopInfo.setAttribute("tp", "UDP");
-            raopInfo.setAttribute("vn", "65537");
-            raopInfo.setAttribute("vs", "377.17.246");
-            raopInfo.setAttribute("vv", "2");
-
-            raopRegListener = new NsdManager.RegistrationListener() {
-                @Override public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                    Log.w(TAG, "RAOP mDNS registration failed: " + errorCode);
-                }
-                @Override public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {}
-                @Override public void onServiceRegistered(NsdServiceInfo serviceInfo) {
-                    Log.i(TAG, "_raop._tcp registered as " + serviceInfo.getServiceName());
-                }
-                @Override public void onServiceUnregistered(NsdServiceInfo serviceInfo) {}
-            };
-            nsdManager.registerService(raopInfo, NsdManager.PROTOCOL_DNS_SD, raopRegListener);
         } catch (Throwable t) {
             Log.e(TAG, "Error registering AirPlay mDNS services", t);
         }
@@ -590,12 +556,6 @@ public class MangoAirPlayManager {
             if (airplayRegListener != null) {
                 nsdManager.unregisterService(airplayRegListener);
                 airplayRegListener = null;
-            }
-        } catch (Throwable ignored) {}
-        try {
-            if (raopRegListener != null) {
-                nsdManager.unregisterService(raopRegListener);
-                raopRegListener = null;
             }
         } catch (Throwable ignored) {}
     }
