@@ -234,7 +234,7 @@ public class MangoAirPlayManager {
                     handleServerInfo(out, protocol, cseq);
                 } else if ("GET".equals(method) && uri.contains("/playback-info")) {
                     handlePlaybackInfo(out, protocol, cseq);
-                } else if ("POST".equals(method) && uri.startsWith("/photo") || "PUT".equals(method) && uri.startsWith("/photo")) {
+                } else if (("POST".equals(method) || "PUT".equals(method)) && uri.startsWith("/photo")) {
                     handlePhoto(in, out, protocol, cseq, contentLength, clientIp, clientName);
                 } else if ("POST".equals(method) && uri.startsWith("/play")) {
                     handlePlay(in, out, protocol, cseq, contentLength, clientIp, clientName);
@@ -244,12 +244,40 @@ public class MangoAirPlayManager {
                     handleRate(out, protocol, cseq, uri);
                 } else if ("POST".equals(method) && uri.startsWith("/stop")) {
                     handleStop(out, protocol, cseq);
-                } else if (uri.startsWith("/pair-setup") || uri.startsWith("/pair-verify") || uri.startsWith("/fp-setup")) {
-                    // Open AirPlay handshake: acknowledge OK so iOS proceeds to media playback
-                    sendGenericResponse(out, protocol, 200, "OK", cseq, "application/octet-stream", "\0\0\0\0");
+                } else if (uri.startsWith("/fp-setup") || uri.startsWith("/auth-setup") || uri.startsWith("/pair-setup") || uri.startsWith("/pair-verify")) {
+                    // Return 404 so Apple client recognizes MFi / FairPlay DRM is not used and falls back to open streaming
+                    sendGenericResponse(out, protocol, 404, "Not Found", cseq, null, null);
                 } else if ("POST".equals(method) && uri.startsWith("/reverse")) {
                     sendGenericResponse(out, protocol, 101, "Switching Protocols", cseq, null, null);
-                } else if ("SETUP".equals(method) || "RECORD".equals(method)) {
+                } else if ("SETUP".equals(method)) {
+                    mainHandler.post(() -> {
+                        if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
+                    });
+                    String transportHeader = headers.get("transport");
+                    String transportResp = "RTP/AVP/UDP;unicast;mode=record;server_port=" + AIRPLAY_PORT;
+                    if (transportHeader != null && transportHeader.contains("control_port")) {
+                        transportResp = transportHeader;
+                    }
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    String resp = proto + " 200 OK\r\n" +
+                            "Server: AirTunes/377.17.246\r\n" +
+                            (cseq != null ? "CSeq: " + cseq + "\r\n" : "") +
+                            "Transport: " + transportResp + "\r\n" +
+                            "Session: 1\r\n" +
+                            "Audio-Jack-Status: connected\r\n" +
+                            "Content-Length: 0\r\n\r\n";
+                    out.write(resp.getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                } else if ("RECORD".equals(method)) {
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    String resp = proto + " 200 OK\r\n" +
+                            "Server: AirTunes/377.17.246\r\n" +
+                            (cseq != null ? "CSeq: " + cseq + "\r\n" : "") +
+                            "Audio-Latency: 0\r\n" +
+                            "Content-Length: 0\r\n\r\n";
+                    out.write(resp.getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                } else if ("ANNOUNCE".equals(method)) {
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
                     });
@@ -290,11 +318,12 @@ public class MangoAirPlayManager {
                 "<plist version=\"1.0\">\n" +
                 "<dict>\n" +
                 "<key>deviceid</key>\n<string>" + hardwareMac + "</string>\n" +
-                "<key>features</key>\n<integer>1518338039</integer>\n" +
+                "<key>features</key>\n<integer>10811</integer>\n" +
                 "<key>model</key>\n<string>AppleTV3,2</string>\n" +
+                "<key>name</key>\n<string>" + serverName + "</string>\n" +
                 "<key>protovers</key>\n<string>1.1</string>\n" +
                 "<key>srcvers</key>\n<string>377.17.246</string>\n" +
-                "<key>flags</key>\n<integer>4</integer>\n" +
+                "<key>flags</key>\n<integer>0</integer>\n" +
                 "<key>pi</key>\n<string>" + pairingId + "</string>\n" +
                 "<key>pk</key>\n<string>" + publicKey + "</string>\n" +
                 "<key>vv</key>\n<integer>2</integer>\n" +
@@ -496,9 +525,9 @@ public class MangoAirPlayManager {
             airplayInfo.setServiceType("_airplay._tcp");
             airplayInfo.setPort(AIRPLAY_PORT);
             airplayInfo.setAttribute("model", "AppleTV3,2");
-            airplayInfo.setAttribute("features", "0x5A7FFFF7,0x1E");
+            airplayInfo.setAttribute("features", "0x2A3B,0x0");
             airplayInfo.setAttribute("srcvers", "377.17.246");
-            airplayInfo.setAttribute("flags", "0x4");
+            airplayInfo.setAttribute("flags", "0x0");
             airplayInfo.setAttribute("protovers", "1.1");
             airplayInfo.setAttribute("vv", "2");
             airplayInfo.setAttribute("deviceid", hardwareMac);
@@ -528,9 +557,9 @@ public class MangoAirPlayManager {
             raopInfo.setAttribute("ch", "2");
             raopInfo.setAttribute("cn", "0,1,2,3");
             raopInfo.setAttribute("da", "true");
-            raopInfo.setAttribute("et", "0,3,5");
-            raopInfo.setAttribute("ft", "0x5A7FFFF7,0x1E");
-            raopInfo.setAttribute("sf", "0x4");
+            raopInfo.setAttribute("et", "0");
+            raopInfo.setAttribute("ft", "0x2A3B,0x0");
+            raopInfo.setAttribute("sf", "0x0");
             raopInfo.setAttribute("md", "0,1,2");
             raopInfo.setAttribute("am", "AppleTV3,2");
             raopInfo.setAttribute("pk", publicKey);
