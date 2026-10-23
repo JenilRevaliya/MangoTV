@@ -24,20 +24,20 @@ public class AirPodsDevice {
 
     public static String resolveModelName(int modelId) {
         switch (modelId) {
-            case 0x0E20: return "AirPods Pro";
-            case 0x1420: return "AirPods Pro 2";
-            case 0x2420: return "AirPods Pro 2 (USB-C)";
-            case 0x0220: return "AirPods (1st Gen)";
-            case 0x0F20: return "AirPods (2nd Gen)";
-            case 0x1320: return "AirPods (3rd Gen)";
-            case 0x1920: return "AirPods 4";
-            case 0x1B20: return "AirPods 4 (ANC)";
-            case 0x0A20: return "AirPods Max";
-            case 0x1F20: return "AirPods Max (USB-C)";
-            case 0x0520: return "Beats Solo Pro";
-            case 0x1020: return "Beats Studio Buds";
-            case 0x1120: return "Beats Fit Pro";
-            case 0x1720: return "Beats Studio Pro";
+            case 0x0E20: case 0x200E: return "AirPods Pro";
+            case 0x1420: case 0x2014: return "AirPods Pro 2";
+            case 0x2420: case 0x2024: return "AirPods Pro 2 (USB-C)";
+            case 0x0220: case 0x2002: return "AirPods (1st Gen)";
+            case 0x0F20: case 0x200F: return "AirPods (2nd Gen)";
+            case 0x1320: case 0x2013: return "AirPods (3rd Gen)";
+            case 0x1920: case 0x2019: return "AirPods 4";
+            case 0x1B20: case 0x201B: return "AirPods 4 (ANC)";
+            case 0x0A20: case 0x200A: return "AirPods Max";
+            case 0x1F20: case 0x201F: return "AirPods Max (USB-C)";
+            case 0x0520: case 0x2005: return "Beats Solo Pro";
+            case 0x1020: case 0x2010: return "Beats Studio Buds";
+            case 0x1120: case 0x2011: return "Beats Fit Pro";
+            case 0x1720: case 0x2017: return "Beats Studio Pro";
             default: return "AirPods";
         }
     }

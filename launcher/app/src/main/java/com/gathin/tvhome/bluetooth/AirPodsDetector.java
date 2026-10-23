@@ -30,8 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AirPodsDetector {
     private static final String TAG = "AirPodsDetector";
     private static final int APPLE_COMPANY_ID = 76; // 0x004C
-    private static final int PROXIMITY_RSSI_THRESHOLD = -82; // Living room proximity threshold
-    private static final long LID_CLOSE_TIMEOUT_MS = 3500L;
+    private static final int PROXIMITY_RSSI_THRESHOLD = -90; // Living room proximity threshold
+    private static final long LID_CLOSE_TIMEOUT_MS = 4000L;
 
     public interface Listener {
         void onAirPodsLidOpened(AirPodsDevice device);
@@ -122,15 +122,8 @@ public class AirPodsDetector {
                 return;
             }
 
-            // Hardware filter: match Apple Inc (76) manufacturer data prefix [0x07, 0x19]
-            byte[] manufacturerData = new byte[]{ 0x07, 0x19 };
-            byte[] manufacturerDataMask = new byte[]{ (byte) 0xFF, (byte) 0xFF };
-
-            ScanFilter filter = new ScanFilter.Builder()
-                    .setManufacturerData(APPLE_COMPANY_ID, manufacturerData, manufacturerDataMask)
-                    .build();
-
-            // Low-power scan mode optimized for TV wall power and minimal CPU cycles
+            // TV Bluetooth controllers often lack hardware APCF filter slots (mMaxScanFilters: 0).
+            // Pass null filters so Android delegates scan results to software filter in processScanResult.
             ScanSettings settings = new ScanSettings.Builder()
                     .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                     .setReportDelay(0)
@@ -143,16 +136,25 @@ public class AirPodsDetector {
                 }
 
                 @Override
+                public void onBatchScanResults(java.util.List<ScanResult> results) {
+                    if (results != null) {
+                        for (ScanResult r : results) {
+                            processScanResult(r);
+                        }
+                    }
+                }
+
+                @Override
                 public void onScanFailed(int errorCode) {
                     Log.e(TAG, "BLE Scan failed: " + errorCode);
                     isScanning = false;
                 }
             };
 
-            bleScanner.startScan(Collections.singletonList(filter), settings, scanCallback);
+            bleScanner.startScan(null, settings, scanCallback);
             isScanning = true;
             watchdogHandler.postDelayed(watchdogRunnable, 1500L);
-            Log.d(TAG, "AirPods BLE scanner active with Apple hardware filter");
+            Log.i(TAG, "AirPods BLE scanner active with zero-filter software parsing");
         } catch (Throwable t) {
             Log.e(TAG, "Error starting AirPods scan", t);
             isScanning = false;
@@ -181,16 +183,16 @@ public class AirPodsDetector {
         ScanRecord record = result.getScanRecord();
         if (record == null) return;
 
+        byte[] data = record.getManufacturerSpecificData(APPLE_COMPANY_ID);
+        if (data == null || data.length < 5) return;
+
+        // Verify Apple proximity message type 0x07 (AirPods proximity pairing)
+        if (data[0] != 0x07) return;
+
         int rssi = result.getRssi();
         if (rssi < PROXIMITY_RSSI_THRESHOLD) {
             return; // Out of living room proximity range
         }
-
-        byte[] data = record.getManufacturerSpecificData(APPLE_COMPANY_ID);
-        if (data == null || data.length < 10) return;
-
-        // Verify Apple proximity message type 0x07 and length 0x19
-        if (data[0] != 0x07 || data[1] != 0x19) return;
 
         String address = result.getDevice().getAddress();
         AirPodsDevice device = trackedDevices.get(address);
@@ -203,40 +205,36 @@ public class AirPodsDetector {
         parsePayload(device, data, rssi);
 
         final AirPodsDevice currentDevice = device;
-        final boolean lidJustOpened = !device.lidOpen && ((data[8] >> 3) & 1) == 0;
-        final boolean currentLidState = ((data[8] >> 3) & 1) == 0;
-
         device.lastSeenMs = System.currentTimeMillis();
         boolean previousLidState = device.lidOpen;
-        device.lidOpen = currentLidState;
+        // Apple AirPods case ONLY transmits type 0x07 proximity packets while lid is open.
+        device.lidOpen = true;
 
         mainHandler.post(() -> {
             if (listener == null) return;
-            if (currentLidState && (!previousLidState || isNew)) {
-                Log.d(TAG, "AirPods lid opened: " + currentDevice.modelName + " (" + address + ") RSSI: " + rssi);
+            if (!previousLidState || isNew) {
+                Log.i(TAG, "AirPods lid opened: " + currentDevice.modelName + " (" + address + ") RSSI: " + rssi);
                 listener.onAirPodsLidOpened(currentDevice);
-            } else if (currentLidState) {
+            } else {
                 listener.onAirPodsStatusUpdated(currentDevice);
-            } else if (!currentLidState && previousLidState) {
-                Log.d(TAG, "AirPods lid closed: " + currentDevice.modelName);
-                listener.onAirPodsLidClosed(currentDevice);
             }
         });
     }
 
     private void parsePayload(AirPodsDevice dev, byte[] data, int rssi) {
+        if (data == null || data.length < 5) return;
         int modelId = ((data[3] & 0xFF) << 8) | (data[4] & 0xFF);
         dev.modelId = modelId;
         dev.modelName = AirPodsDevice.resolveModelName(modelId);
+        dev.rssi = rssi;
 
+        if (data.length < 7) return;
         int status = data[5] & 0xFF;
         int podsBattery = data[6] & 0xFF;
-        int flagsCase = data[7] & 0xFF;
-        int lid = data[8] & 0xFF;
-        int colorId = data[9] & 0xFF;
+        int flagsCase = (data.length > 7) ? (data[7] & 0xFF) : 0;
+        int colorId = (data.length > 9) ? (data[9] & 0xFF) : 0;
 
         dev.colorName = AirPodsDevice.resolveColor(colorId);
-        dev.rssi = rssi;
 
         boolean primaryLeft = ((status >> 5) & 0x01) == 1;
         boolean thisInCase = ((status >> 6) & 0x01) == 1;

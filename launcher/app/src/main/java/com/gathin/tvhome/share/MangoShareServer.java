@@ -254,7 +254,9 @@ public class MangoShareServer {
                 return;
             }
 
-            if ("GET".equals(method) && path.equals("/api/localsend/v2/info")) {
+            if (("GET".equals(method) || "HEAD".equals(method)) && (path.equals("/") || path.equals("/drop") || path.equals("/web") || path.equals("/share"))) {
+                handleWebDropPage(out);
+            } else if ("GET".equals(method) && path.equals("/api/localsend/v2/info")) {
                 handleGetInfo(out);
             } else if ("POST".equals(method) && path.equals("/api/localsend/v2/register")) {
                 handleGetInfo(out);
@@ -274,6 +276,121 @@ public class MangoShareServer {
                 socket.close();
             } catch (Throwable ignored) {}
         }
+    }
+
+    private void handleWebDropPage(OutputStream out) throws Exception {
+        String html = "<!DOCTYPE html>\n" +
+                "<html lang=\"en\">\n" +
+                "<head>\n" +
+                "<meta charset=\"UTF-8\">\n" +
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n" +
+                "<title>Mango Share • AirDrop to TV</title>\n" +
+                "<style>\n" +
+                "  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; }\n" +
+                "  body { background: #0A0D14; color: #FFFFFF; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }\n" +
+                "  .card { width: 100%; max-width: 440px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 28px; backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); padding: 32px 24px; text-align: center; box-shadow: 0 30px 60px rgba(0,0,0,0.4); }\n" +
+                "  .icon-ring { width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 50%; background: linear-gradient(135deg, rgba(0,122,255,0.2), rgba(88,86,214,0.3)); display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(0,122,255,0.4); }\n" +
+                "  .icon-ring svg { width: 44px; height: 44px; fill: none; stroke: #007AFF; stroke-width: 2.2; stroke-linecap: round; }\n" +
+                "  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 6px; }\n" +
+                "  p.sub { font-size: 14px; color: #8E8E93; margin-bottom: 24px; line-height: 1.4; }\n" +
+                "  .drop-zone { border: 2px dashed rgba(255,255,255,0.2); border-radius: 20px; padding: 28px 16px; margin-bottom: 20px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.03); }\n" +
+                "  .drop-zone:hover, .drop-zone.active { border-color: #007AFF; background: rgba(0,122,255,0.08); }\n" +
+                "  .file-badge { font-size: 15px; font-weight: 600; color: #FFFFFF; }\n" +
+                "  .file-meta { font-size: 12px; color: #8E8E93; margin-top: 4px; }\n" +
+                "  .btn-send { width: 100%; padding: 16px; border: none; border-radius: 16px; background: #007AFF; color: #FFF; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.15s, background 0.15s; }\n" +
+                "  .btn-send:disabled { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.3); cursor: not-allowed; }\n" +
+                "  .btn-send:not(:disabled):active { transform: scale(0.98); background: #0062CC; }\n" +
+                "  .progress-wrap { margin-top: 20px; display: none; }\n" +
+                "  .prog-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }\n" +
+                "  .prog-bar-fill { height: 100%; width: 0%; background: #34C759; border-radius: 4px; transition: width 0.2s; }\n" +
+                "  .status-text { font-size: 13px; color: #8E8E93; }\n" +
+                "  .info-box { margin-top: 24px; padding: 14px 16px; background: rgba(255,255,255,0.04); border-radius: 16px; font-size: 12px; color: #8E8E93; line-height: 1.5; text-align: left; border: 1px solid rgba(255,255,255,0.08); }\n" +
+                "  .info-box strong { color: #FFF; }\n" +
+                "</style>\n" +
+                "</head>\n" +
+                "<body>\n" +
+                "<div class=\"card\">\n" +
+                "  <div class=\"icon-ring\">\n" +
+                "    <svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"2.5\" fill=\"#007AFF\"/><path d=\"M4.93 19.07A10 10 0 0 1 12 2a10 10 0 0 1 7.07 17.07\"/><path d=\"M8.46 15.54A5 5 0 0 1 12 7a5 5 0 0 1 3.54 8.54\"/></svg>\n" +
+                "  </div>\n" +
+                "  <h1>Mango Share</h1>\n" +
+                "  <p class=\"sub\">Send photos & files to " + deviceName + "</p>\n" +
+                "  <input type=\"file\" id=\"fileInput\" multiple style=\"display:none\">\n" +
+                "  <div class=\"drop-zone\" id=\"dropZone\" onclick=\"document.getElementById('fileInput').click()\">\n" +
+                "    <div class=\"file-badge\" id=\"fileLabel\">Choose Photos or Files</div>\n" +
+                "    <div class=\"file-meta\" id=\"fileSubLabel\">Tap to select from your iPhone</div>\n" +
+                "  </div>\n" +
+                "  <button class=\"btn-send\" id=\"btnSend\" disabled onclick=\"startTransfer()\">Send to TV</button>\n" +
+                "  <div class=\"progress-wrap\" id=\"progWrap\">\n" +
+                "    <div class=\"prog-bar-bg\"><div class=\"prog-bar-fill\" id=\"progFill\"></div></div>\n" +
+                "    <div class=\"status-text\" id=\"statusMsg\">Waiting for TV approval...</div>\n" +
+                "  </div>\n" +
+                "  <div class=\"info-box\">\n" +
+                "    <strong>AirDrop via LocalSend:</strong> For native iOS Share Sheet integration, install <strong>LocalSend</strong> from the App Store. " + deviceName + " will appear automatically under Nearby Devices.\n" +
+                "  </div>\n" +
+                "</div>\n" +
+                "<script>\n" +
+                "  let selectedFiles = [];\n" +
+                "  const input = document.getElementById('fileInput');\n" +
+                "  const label = document.getElementById('fileLabel');\n" +
+                "  const subLabel = document.getElementById('fileSubLabel');\n" +
+                "  const btn = document.getElementById('btnSend');\n" +
+                "  const progWrap = document.getElementById('progWrap');\n" +
+                "  const progFill = document.getElementById('progFill');\n" +
+                "  const statusMsg = document.getElementById('statusMsg');\n" +
+                "  input.addEventListener('change', e => {\n" +
+                "    selectedFiles = Array.from(e.target.files);\n" +
+                "    if (selectedFiles.length > 0) {\n" +
+                "      const totalBytes = selectedFiles.reduce((acc, f) => acc + f.size, 0);\n" +
+                "      const mb = (totalBytes / (1024*1024)).toFixed(1);\n" +
+                "      label.innerText = selectedFiles.length === 1 ? selectedFiles[0].name : (selectedFiles.length + ' files selected');\n" +
+                "      subLabel.innerText = mb + ' MB total • Ready to send';\n" +
+                "      btn.disabled = false;\n" +
+                "    }\n" +
+                "  });\n" +
+                "  async function startTransfer() {\n" +
+                "    if (!selectedFiles.length) return;\n" +
+                "    btn.disabled = true;\n" +
+                "    progWrap.style.display = 'block';\n" +
+                "    statusMsg.innerText = 'Please accept transfer on your TV screen...';\n" +
+                "    try {\n" +
+                "      const filesPayload = {};\n" +
+                "      selectedFiles.forEach((f, idx) => {\n" +
+                "        filesPayload['f_' + idx] = { id: 'f_' + idx, fileName: f.name, size: f.size, fileType: f.type || 'application/octet-stream' };\n" +
+                "      });\n" +
+                "      const prepRes = await fetch('/api/localsend/v2/prepare-upload', {\n" +
+                "        method: 'POST',\n" +
+                "        headers: { 'Content-Type': 'application/json' },\n" +
+                "        body: JSON.stringify({ info: { alias: 'iPhone Safari', deviceModel: 'iPhone', deviceType: 'mobile' }, files: filesPayload })\n" +
+                "      });\n" +
+                "      if (!prepRes.ok) throw new Error('Transfer declined on TV');\n" +
+                "      const prepData = await prepRes.json();\n" +
+                "      const sessionId = prepData.sessionId;\n" +
+                "      const fileTokens = prepData.files;\n" +
+                "      for (let i = 0; i < selectedFiles.length; i++) {\n" +
+                "        const f = selectedFiles[i];\n" +
+                "        const fileId = 'f_' + i;\n" +
+                "        const token = fileTokens[fileId];\n" +
+                "        statusMsg.innerText = 'Sending ' + f.name + ' (' + (i+1) + '/' + selectedFiles.length + ')...';\n" +
+                "        await fetch('/api/localsend/v2/upload?sessionId=' + sessionId + '&fileId=' + fileId + '&token=' + token, {\n" +
+                "          method: 'POST',\n" +
+                "          body: f\n" +
+                "        });\n" +
+                "        progFill.style.width = Math.round(((i + 1) / selectedFiles.length) * 100) + '%';\n" +
+                "      }\n" +
+                "      statusMsg.innerText = 'Transfer complete! Saved to TV.';\n" +
+                "      progFill.style.background = '#34C759';\n" +
+                "    } catch (err) {\n" +
+                "      statusMsg.innerText = err.message || 'Transfer failed';\n" +
+                "      progFill.style.background = '#FF3B30';\n" +
+                "    } finally {\n" +
+                "      btn.disabled = false;\n" +
+                "    }\n" +
+                "  }\n" +
+                "</script>\n" +
+                "</body>\n" +
+                "</html>";
+        sendResponse(out, 200, "OK", "text/html", html);
     }
 
     private void handleGetInfo(OutputStream out) throws Exception {
