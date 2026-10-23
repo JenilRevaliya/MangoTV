@@ -107,10 +107,9 @@ Psychology confirms people trust numbers over claims. Here is the verified bench
 
 ### Live Hardware Video Demo
 
-<div align="center">
-  <video src="assets/demo.mp4" width="92%" controls autoplay muted loop></video>
-  <p><i>Live 60fps capture demonstrating fluid D-pad navigation, Apple TV-grade liquid glass slider, and instant app launching on physical TV hardware.</i></p>
-</div>
+https://github.com/user-attachments/assets/a6a6565f-cac6-4bf0-9164-c97da3fc5f47
+
+<p align="center"><i>Live 60fps capture demonstrating fluid D-pad navigation, Apple TV-grade liquid glass slider, and instant app launching on physical TV hardware.</i></p>
 
 ---
 
