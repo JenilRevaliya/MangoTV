@@ -80,6 +80,38 @@ Psychology confirms people trust numbers over claims. Here is the verified bench
 
 ---
 
+### Real-World Living Room Hardware
+
+<div align="center">
+  <table width="100%">
+    <tr>
+      <td width="33%" align="center">
+        <img src="assets/tv-living-room.jpg" width="100%" alt="Living Room TV Home Screen" />
+        <br><b>Living Room Home Screen</b>
+      </td>
+      <td width="33%" align="center">
+        <img src="assets/tv-apps-grid.jpg" width="100%" alt="Living Room TV Apps Grid" />
+        <br><b>All Apps Grid</b>
+      </td>
+      <td width="33%" align="center">
+        <img src="assets/tv-screensaver.jpg" width="100%" alt="Living Room TV Screensaver" />
+        <br><b>Aerial Screensaver</b>
+      </td>
+    </tr>
+  </table>
+</div>
+
+---
+
+### Live Hardware Video Demo
+
+<div align="center">
+  <video src="assets/demo.mp4" width="92%" controls autoplay muted loop></video>
+  <p><i>Live 60fps capture demonstrating fluid D-pad navigation, Apple TV-grade liquid glass slider, and instant app launching on physical TV hardware.</i></p>
+</div>
+
+---
+
 ## Before vs After
 
 <div align="center">
