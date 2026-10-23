@@ -9,6 +9,8 @@
 Crafted by **Jenil Soni** | [www.jenil.me](https://www.jenil.me)
 
 <p align="center">
+  <a href="https://github.com/JenilRevaliya/MangoTV/releases/latest/download/MangoTV-v1.0.0.apk"><img src="https://img.shields.io/badge/Download-Latest%20APK-00C853?style=for-the-badge&logo=android&logoColor=white" alt="Download Latest APK" /></a>
+  <a href="https://github.com/JenilRevaliya/MangoTV/releases/latest"><img src="https://img.shields.io/badge/Release-v1.0.0-0288D1?style=for-the-badge&logo=github&logoColor=white" alt="Latest Release" /></a>
   <a href="https://www.jenil.me"><img src="https://img.shields.io/badge/Developer-Jenil%20Soni-000000?style=for-the-badge&logo=safari&logoColor=white" alt="Developer Website" /></a>
   <img src="https://img.shields.io/badge/Platform-Android%20TV-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android TV" />
   <img src="https://img.shields.io/badge/Language-Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java" />
@@ -57,7 +59,7 @@ Psychology confirms people trust numbers over claims. Here is the verified bench
 ### Interface Overview
 
 <div align="center">
-  <img src="assets/screenshot-home.png" width="92%" alt="MangoTV Home Screen with Continue Watching" />
+  <img src="assets/screenshot-home.jpg" width="92%" alt="MangoTV Home Screen with Continue Watching" />
   <p><i>Home screen displaying Apple-grade typography, dynamic 4K art, unified Continue Watching, and Mac dock.</i></p>
 </div>
 
@@ -67,11 +69,11 @@ Psychology confirms people trust numbers over claims. Here is the verified bench
   <table width="100%">
     <tr>
       <td width="50%" align="center">
-        <img src="assets/screenshot-dock.png" width="100%" alt="Mac Dock with Liquid Glass Slider" />
+        <img src="assets/screenshot-dock.jpg" width="100%" alt="Mac Dock with Liquid Glass Slider" />
         <br><b>Mac-Style Dock with Liquid Glass Slider</b>
       </td>
       <td width="50%" align="center">
-        <img src="assets/screenshot-scenery.png" width="100%" alt="Curated 4K Dynamic Landscape Wallpaper" />
+        <img src="assets/screenshot-scenery.jpg" width="100%" alt="Curated 4K Dynamic Landscape Wallpaper" />
         <br><b>Dynamic 4K Internet Landscape Wallpaper</b>
       </td>
     </tr>
@@ -122,12 +124,12 @@ Psychology confirms people trust numbers over claims. Here is the verified bench
     </tr>
     <tr>
       <td align="center">
-        <img src="assets/before.png" width="100%" alt="Stock Android TV with Ads" />
+        <img src="assets/before.jpg" width="100%" alt="Stock Android TV with Ads" />
         <br>
         Slow, cluttered with sponsored carousels, 480 MB RAM usage, 4.8s boot latency.
       </td>
       <td align="center">
-        <img src="assets/after.png" width="100%" alt="MangoTV Clean Interface" />
+        <img src="assets/after.jpg" width="100%" alt="MangoTV Clean Interface" />
         <br>
         Instant, zero ads, 32 MB RAM usage, fluid 60fps glass physics.
       </td>
@@ -211,7 +213,14 @@ Psychology confirms people trust numbers over claims. Here is the verified bench
 
 ## Installation Guide
 
-You can install MangoTV on any Android TV, Google TV, or Amazon Fire TV device.
+### Download Latest Build
+
+Get the verified release APK directly from GitHub Releases:
+
+* **Direct APK Download:** [MangoTV-v1.0.0.apk](https://github.com/JenilRevaliya/MangoTV/releases/latest/download/MangoTV-v1.0.0.apk) (2.3 MB)
+* **Releases & Changelog:** [GitHub Releases](https://github.com/JenilRevaliya/MangoTV/releases/latest)
+
+You can install MangoTV on any Android TV, Google TV, or Amazon Fire TV device using any of the methods below.
 
 ### Method 1: Install via ADB over Wi-Fi (Recommended)
 
@@ -219,15 +228,15 @@ You can install MangoTV on any Android TV, Google TV, or Amazon Fire TV device.
    * Go to **Settings** > **Device Preferences** > **About**.
    * Click **Build** 7 times until Developer Mode is unlocked.
    * Go to **Developer Options** and enable **Network Debugging** (ADB).
-   * Note the IP address displayed on your TV screen (e.g. `192.168.1.11`).
+   * Note the IP address displayed on your TV screen (e.g. `192.168.1.1`).
 
 2. **Connect and Install from your Computer:**
    ```bash
    # Connect to your TV over Wi-Fi
-   adb connect 192.168.1.11:5555
+   adb connect 192.168.1.1:5555
 
    # Install the release APK
-   adb install -r app-release.apk
+   adb install -r MangoTV-v1.0.0.apk
 
    # Launch MangoTV
    adb shell am start -n com.gathin.tvhome/.MainActivity
@@ -237,10 +246,10 @@ You can install MangoTV on any Android TV, Google TV, or Amazon Fire TV device.
 
 ### Method 2: Install via USB Drive
 
-1. Download `app-release.apk` to a USB flash drive formatted as FAT32 or exFAT.
+1. Download [MangoTV-v1.0.0.apk](https://github.com/JenilRevaliya/MangoTV/releases/latest/download/MangoTV-v1.0.0.apk) to a USB flash drive formatted as FAT32 or exFAT.
 2. Plug the USB drive into your Android TV or TV Box.
 3. Open any file manager on your TV (such as FX File Explorer or File Commander).
-4. Navigate to the USB drive and click `app-release.apk`.
+4. Navigate to the USB drive and click `MangoTV-v1.0.0.apk`.
 5. Select **Install**.
 
 ---
@@ -249,7 +258,11 @@ You can install MangoTV on any Android TV, Google TV, or Amazon Fire TV device.
 
 1. Open the app store on your TV and install the free **Downloader by AFTVnews** app.
 2. In TV Settings > Developer Options, grant **Install Unknown Apps** permission to Downloader.
-3. Open Downloader, enter the direct download link to `app-release.apk`, and select **Go**.
+3. Open Downloader, enter the direct download link:
+   ```
+   https://github.com/JenilRevaliya/MangoTV/releases/latest/download/MangoTV-v1.0.0.apk
+   ```
+   and select **Go**.
 4. Click **Install** when prompted.
 
 ---
