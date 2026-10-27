@@ -227,6 +227,8 @@ public class MangoAirPlayManager {
 
                 Log.i(TAG, "AirPlay RX: " + method + " " + uri + " (CSeq=" + cseq + ") headers=" + headers + " from " + clientIp);
 
+                boolean bodyHandled = false;
+
                 if ("OPTIONS".equals(method)) {
                     handleOptions(out, protocol, cseq);
                 } else if ("GET".equals(method) && (uri.contains("/server-info") || uri.contains("/info"))) {
@@ -235,8 +237,10 @@ public class MangoAirPlayManager {
                     handlePlaybackInfo(out, protocol, cseq);
                 } else if (("POST".equals(method) || "PUT".equals(method)) && uri.startsWith("/photo")) {
                     handlePhoto(in, out, protocol, cseq, contentLength, clientIp, clientName);
+                    bodyHandled = true;
                 } else if ("POST".equals(method) && uri.startsWith("/play")) {
-                    handlePlay(in, out, protocol, cseq, contentLength, clientIp, clientName);
+                    handlePlay(in, out, protocol, cseq, contentLength, clientIp, clientName, headers);
+                    bodyHandled = true;
                 } else if ("POST".equals(method) && uri.startsWith("/scrub")) {
                     handleScrub(out, protocol, cseq, uri);
                 } else if ("POST".equals(method) && uri.startsWith("/rate")) {
@@ -290,6 +294,11 @@ public class MangoAirPlayManager {
                 } else {
                     sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
                 }
+
+                // Drain any unconsumed request body so subsequent requests on this keep-alive socket stay aligned
+                if (!bodyHandled && contentLength > 0 && contentLength < 35 * 1024 * 1024) {
+                    readExactBytes(in, (int) contentLength);
+                }
             }
         } catch (Throwable t) {
             Log.w(TAG, "AirPlay socket session exception: " + t.getMessage());
@@ -317,12 +326,13 @@ public class MangoAirPlayManager {
                 "<plist version=\"1.0\">\n" +
                 "<dict>\n" +
                 "<key>deviceid</key>\n<string>" + hardwareMac + "</string>\n" +
-                "<key>features</key>\n<integer>8251</integer>\n" +
+                "<key>features</key>\n<integer>9147</integer>\n" +
                 "<key>model</key>\n<string>AppleTV3,2</string>\n" +
                 "<key>name</key>\n<string>" + serverName + "</string>\n" +
                 "<key>protovers</key>\n<string>1.1</string>\n" +
                 "<key>srcvers</key>\n<string>377.17.246</string>\n" +
                 "<key>flags</key>\n<integer>0</integer>\n" +
+                "<key>acl</key>\n<integer>0</integer>\n" +
                 "<key>pi</key>\n<string>" + pairingId + "</string>\n" +
                 "<key>pk</key>\n<string>" + publicKey + "</string>\n" +
                 "<key>vv</key>\n<integer>2</integer>\n" +
@@ -385,7 +395,7 @@ public class MangoAirPlayManager {
         sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
     }
 
-    private void handlePlay(InputStream in, OutputStream out, String protocol, String cseq, long contentLength, String clientIp, String clientName) throws IOException {
+    private void handlePlay(InputStream in, OutputStream out, String protocol, String cseq, long contentLength, String clientIp, String clientName, Map<String, String> headers) throws IOException {
         String body = "";
         if (contentLength > 0 && contentLength < 1024 * 1024) {
             byte[] bytes = readExactBytes(in, (int) contentLength);
@@ -396,7 +406,15 @@ public class MangoAirPlayManager {
         String videoUrl = null;
         float startPos = 0.0f;
 
-        if (body.contains("Content-Location:")) {
+        // Check Content-Location HTTP header first
+        if (headers != null) {
+            String clHeader = headers.get("content-location");
+            if (clHeader != null && !clHeader.isEmpty()) {
+                videoUrl = clHeader.trim();
+            }
+        }
+
+        if (videoUrl == null && body.contains("Content-Location:")) {
             for (String line : body.split("\n")) {
                 line = line.trim();
                 if (line.startsWith("Content-Location:")) {
@@ -525,10 +543,11 @@ public class MangoAirPlayManager {
             airplayInfo.setServiceType("_airplay._tcp");
             airplayInfo.setPort(AIRPLAY_PORT);
             airplayInfo.setAttribute("model", "AppleTV3,2");
-            airplayInfo.setAttribute("features", "0x203B,0x0");
+            airplayInfo.setAttribute("features", "0x23BB,0x0");
             airplayInfo.setAttribute("srcvers", "377.17.246");
             airplayInfo.setAttribute("flags", "0x0");
             airplayInfo.setAttribute("protovers", "1.1");
+            airplayInfo.setAttribute("acl", "0");
             airplayInfo.setAttribute("vv", "2");
             airplayInfo.setAttribute("deviceid", hardwareMac);
             airplayInfo.setAttribute("pi", pairingId);
