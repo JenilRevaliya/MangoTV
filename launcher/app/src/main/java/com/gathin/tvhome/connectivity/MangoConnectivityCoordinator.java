@@ -216,7 +216,7 @@ public class MangoConnectivityCoordinator {
         if (btnSecondary != null) {
             btnSecondary.setOnClickListener(v -> handleSecondaryAction());
             btnSecondary.setOnFocusChangeListener((v, hasFocus) -> {
-                btnSecondary.setTextColor(hasFocus ? 0xFF000000 : 0xB3FFFFFF);
+                btnSecondary.setTextColor(hasFocus ? 0xFF000000 : 0xFFFFFFFF);
                 if (hasFocus && listener != null) listener.playNavSound();
             });
         }
@@ -676,6 +676,10 @@ public class MangoConnectivityCoordinator {
                     .withEndAction(() -> {
                         if (btnPrimary != null && btnPrimary.isAttachedToWindow()) {
                             btnPrimary.requestFocus();
+                            btnPrimary.setTextColor(0xFF000000);
+                        }
+                        if (btnSecondary != null) {
+                            btnSecondary.setTextColor(0xFFFFFFFF);
                         }
                     })
                     .start();

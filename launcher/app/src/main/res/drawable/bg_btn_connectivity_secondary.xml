@@ -61,7 +61,7 @@
         </layer-list>
     </item>
 
-    <!-- Normal State: Translucent Frosted Liquid Glass (NO BORDERS) -->
+    <!-- Normal (Unfocused) State: Translucent Frosted Liquid Glass (NO BORDERS) -->
     <item>
         <layer-list>
             <item

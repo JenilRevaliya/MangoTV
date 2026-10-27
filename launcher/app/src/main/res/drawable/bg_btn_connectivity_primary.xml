@@ -61,9 +61,10 @@
         </layer-list>
     </item>
 
-    <!-- Normal State: Translucent Glass with Minor Ambient Drop Shadow (NO BORDERS) -->
+    <!-- Normal (Unfocused) State: Translucent Frosted Glass with Minor Ambient Drop Shadow (NO BORDERS) -->
     <item>
         <layer-list>
+            <!-- Minor Ambient Drop Shadow Layer (Offset down 2dp) -->
             <item
                 android:bottom="0dp"
                 android:left="0dp"
@@ -74,6 +75,7 @@
                     <solid android:color="#33000000" />
                 </shape>
             </item>
+            <!-- Translucent Surface Glass -->
             <item
                 android:bottom="2dp"
                 android:left="0dp"
@@ -83,9 +85,9 @@
                     <corners android:radius="24dp" />
                     <gradient
                         android:angle="270"
-                        android:startColor="#F0FFFFFF"
-                        android:centerColor="#E6FFFFFF"
-                        android:endColor="#D9FFFFFF" />
+                        android:startColor="#2EFFFFFF"
+                        android:centerColor="#1EFFFFFF"
+                        android:endColor="#14FFFFFF" />
                 </shape>
             </item>
         </layer-list>
