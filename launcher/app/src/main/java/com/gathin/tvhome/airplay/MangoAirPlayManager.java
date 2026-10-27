@@ -28,9 +28,13 @@ import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.math.BigInteger;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +54,81 @@ import java.util.concurrent.Executors;
 public class MangoAirPlayManager {
     private static final String TAG = "MangoAirPlayManager";
     public static final int AIRPLAY_PORT = 7000;
+
+    // AirPort Express RSA private key (used by open-source AirPlay receivers like shairport-sync
+    // for Apple-Challenge / Apple-Response authentication).
+    // Without this, iOS drops the RAOP audio streaming connection immediately after OPTIONS.
+    private static final String AIRPORT_RSA_KEY_B64 =
+            "MIIEpQIBAAKCAQEA59dE8qLieItsH1WgjrcFRKj6eUWqi+bGLOX1HL3U3GhC/j0Qg90u3sG/1CUt" +
+            "wC5vOYvfDmFI6oSFXi5ELabWJmT2dKHzBJKa3k9ok+8t9ucRqMd6DZHJ2YCCLlDRKSKv6kDqnw4U" +
+            "wPdpOMXziC/AMj3Z/lUVX1G7WSHCAWKf1zNS1eLvqr+boEjXuBOitnZ/bDzPHrTOZz0Dew0uowxf" +
+            "/+sG+NCK3eQJVxqcaJ/vEHKIVd2M+5qL71yJQ+87X6oV3eaYvt3zWZYD6z5vYTcrtij2VZ9Zmni/" +
+            "UAaHqn9JdsBWLUEpVviYnhimNVvYFZeCXg/IdTQ+x4IRdiXNv5hEewIDAQABAoIBAQDl8Axy9XfW" +
+            "BLmkzkEiqoSwF0PsmVrPzH9KsnwLGH+QZlvjWd8SWYGN7u1507HvhF5N3drJoVU3O14nDY4TFQAa" +
+            "LlJ9VM35AApXaLyY1ERrN7u9ALKd2LUwYhM7Km539O4yUFYikE2nIPscEsA5ltpxOgUGCY7b7ez5" +
+            "NtD6nL1ZKauw7aNXmVAvmJTcuPxWmoktF3gDJKK2wxZuNGcJE0uFQEG4Z3BrWP7yoNuSK3dii2jm" +
+            "lpPHr0O/KnPQtzI3eguhe0TwUem/eYSdyzMyVx/YpwkzwtYL3sR5k0o9rKQLtvLzfAqdBxBurciz" +
+            "aaA/L0HIgAmOit1GJA2saMxTVPNhAoGBAPfgv1oeZxgxmotiCcMXFEQEWflzhWYTsXrhUIuz5jFu" +
+            "a39GLS99ZEErhLdrwj8rDDViRVJ5skOp9zFvlYAHs0xh92ji1E7V/ysnKBfsMrPkk5KSKPrnjndM" +
+            "oPdevWnVkgJ5jxFuNgxkOLMuG9i53B4yMvDTCRiIPMQ++N2iLDaRAoGBAO9v//mU8eVkQaoANf0Z" +
+            "oMjW8CN4xwWA2cSEIHkd9AfFkftuv8oyLDCG3ZAf0vrhrrtkrfa7ef+AUb69DNggq4mHQAYBp7L+" +
+            "k5DKzJrKuO0r+R0YbY9pZD1+/g9dVt91d6LQNepUE/yY2PP5CNoFmjedpLHMOPFdVgqDzDFxU8hL" +
+            "AoGBANDrr7xAJbqBjHVwIzQ4To9pb4BNeqDndk5Qe7fT3+/H1njGaC0/rXE0Qb7q5ySgnsCb3DvA" +
+            "cJyRM9SJ7OKlGt0FMSdJD5KG0XPIpAVNwgpXXH5MDJg09KHeh0kXo+QA6viFBi21y340NonnEfdf" +
+            "54PX4ZGS/Xac1UK+pLkBB+zRAoGAf0AY3H3qKS2lMEI4bzEFoHeK3G895pDaK3TFBVmD7fV0Zhov" +
+            "17fegFPMwOII8MisYm9ZfT2Z0s5Ro3s5rkt+nvLAdfC/PYPKzTLalpGSwomSNYJcB9HNMlmhkGzc" +
+            "1JnLYT4iyUyx6pcZBmCd8bD0iwY/FzcgNDaUmbX9+XDvRA0CgYEAkE7pIPlE71qvfJQgoA9em0gI" +
+            "LAuE4Pu13aKiJnfft7hIjbK+5kyb3TysZvoyDnb3HOKvInK7vXbKuU4ISgxB2bB3HcYzQMGsz1qJ" +
+            "2gG0N5hvJpzwwhbhXqFKA4zaaSrw622wDniAK5MlIE0tIAKKP4yxNGjoD2QYjhBGuhvkWKY=";
+
+    private static BigInteger RSA_N;
+    private static BigInteger RSA_D;
+
+    static {
+        try {
+            byte[] der = android.util.Base64.decode(AIRPORT_RSA_KEY_B64, android.util.Base64.DEFAULT);
+            int idx = 0;
+            if ((der[idx] & 0xFF) == 0x30) {
+                idx++;
+                if ((der[idx] & 0x80) != 0) {
+                    idx += 1 + (der[idx] & 0x7F);
+                } else {
+                    idx++;
+                }
+            }
+            List<byte[]> ints = new ArrayList<>();
+            while (idx < der.length && ints.size() < 4) {
+                if ((der[idx] & 0xFF) == 0x02) {
+                    idx++;
+                    int len;
+                    if ((der[idx] & 0x80) != 0) {
+                        int nbytes = der[idx] & 0x7F;
+                        len = 0;
+                        for (int k = 0; k < nbytes; k++) {
+                            len = (len << 8) | (der[idx + 1 + k] & 0xFF);
+                        }
+                        idx += 1 + nbytes;
+                    } else {
+                        len = der[idx] & 0xFF;
+                        idx++;
+                    }
+                    byte[] val = new byte[len];
+                    System.arraycopy(der, idx, val, 0, len);
+                    ints.add(val);
+                    idx += len;
+                } else {
+                    break;
+                }
+            }
+            if (ints.size() >= 4) {
+                RSA_N = new BigInteger(1, ints.get(1));
+                RSA_D = new BigInteger(1, ints.get(3));
+                Log.i(TAG, "AirPort Express RSA private key loaded successfully (" + RSA_N.bitLength() + " bits)");
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to parse AirPort RSA key", t);
+        }
+    }
 
     public interface Listener {
         void onAirPlayClientConnected(String clientIp, String deviceName);
@@ -292,7 +371,7 @@ public class MangoAirPlayManager {
                 boolean bodyHandled = false;
 
                 if ("OPTIONS".equals(method)) {
-                    handleOptions(out, protocol, cseq);
+                    handleOptions(out, protocol, cseq, headers, socket);
                 } else if ("GET".equals(method) && (uri.contains("/server-info") || uri.contains("/info"))) {
                     handleServerInfo(out, protocol, cseq);
                 } else if ("GET".equals(method) && uri.contains("/playback-info")) {
@@ -321,23 +400,35 @@ public class MangoAirPlayManager {
                     int audioPort = (rtpAudioSocket != null && !rtpAudioSocket.isClosed()) ? rtpAudioSocket.getLocalPort() : RTP_AUDIO_PORT;
                     int controlPort = (rtpControlSocket != null && !rtpControlSocket.isClosed()) ? rtpControlSocket.getLocalPort() : RTP_CONTROL_PORT;
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
-                    String resp = proto + " 200 OK\r\n" +
-                            "Server: AirTunes/377.17.246\r\n" +
-                            (cseq != null ? "CSeq: " + cseq + "\r\n" : "") +
-                            "Transport: RTP/AVP/UDP;unicast;mode=record;server_port=" + audioPort + ";control_port=" + controlPort + ";timing_port=0\r\n" +
-                            "Session: 1\r\n" +
-                            "Audio-Jack-Status: connected\r\n" +
-                            "Content-Length: 0\r\n\r\n";
-                    out.write(resp.getBytes(StandardCharsets.US_ASCII));
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Transport: RTP/AVP/UDP;unicast;interleaved=0-1;mode=record;server_port=").append(audioPort).append(";control_port=").append(controlPort).append(";timing_port=0\r\n");
+                    respSb.append("Session: 1\r\n");
+                    respSb.append("Audio-Jack-Status: connected; type=analog\r\n");
+                    String challenge = headers.get("apple-challenge");
+                    if (challenge != null && !challenge.isEmpty()) {
+                        String appleResp = computeAppleResponse(challenge, socket);
+                        if (appleResp != null) respSb.append("Apple-Response: ").append(appleResp).append("\r\n");
+                    }
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 } else if ("RECORD".equals(method)) {
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
-                    String resp = proto + " 200 OK\r\n" +
-                            "Server: AirTunes/377.17.246\r\n" +
-                            (cseq != null ? "CSeq: " + cseq + "\r\n" : "") +
-                            "Audio-Latency: 0\r\n" +
-                            "Content-Length: 0\r\n\r\n";
-                    out.write(resp.getBytes(StandardCharsets.US_ASCII));
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Audio-Latency: 0\r\n");
+                    String challenge = headers.get("apple-challenge");
+                    if (challenge != null && !challenge.isEmpty()) {
+                        String appleResp = computeAppleResponse(challenge, socket);
+                        if (appleResp != null) respSb.append("Apple-Response: ").append(appleResp).append("\r\n");
+                    }
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 } else if ("GET_PARAMETER".equals(method)) {
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
@@ -349,7 +440,19 @@ public class MangoAirPlayManager {
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
                     });
-                    sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    String challenge = headers.get("apple-challenge");
+                    if (challenge != null && !challenge.isEmpty()) {
+                        String appleResp = computeAppleResponse(challenge, socket);
+                        if (appleResp != null) respSb.append("Apple-Response: ").append(appleResp).append("\r\n");
+                    }
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
                 } else if ("TEARDOWN".equals(method)) {
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayStopped();
@@ -374,15 +477,110 @@ public class MangoAirPlayManager {
         }
     }
 
-    private void handleOptions(OutputStream out, String protocol, String cseq) throws IOException {
+    private void handleOptions(OutputStream out, String protocol, String cseq, Map<String, String> headers, Socket socket) throws IOException {
         String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
-        String resp = proto + " 200 OK\r\n" +
-                "Server: AirTunes/377.17.246\r\n" +
-                (cseq != null ? "CSeq: " + cseq + "\r\n" : "") +
-                "Public: ANNOUNCE, SETUP, RECORD, PAUSE, FLUSH, TEARDOWN, OPTIONS, GET_PARAMETER, SET_PARAMETER, POST, GET, PUT\r\n" +
-                "Content-Length: 0\r\n\r\n";
-        out.write(resp.getBytes(StandardCharsets.US_ASCII));
+        StringBuilder sb = new StringBuilder();
+        sb.append(proto).append(" 200 OK\r\n");
+        sb.append("Server: AirTunes/377.17.246\r\n");
+        if (cseq != null) sb.append("CSeq: ").append(cseq).append("\r\n");
+        sb.append("Public: ANNOUNCE, SETUP, RECORD, PAUSE, FLUSH, TEARDOWN, OPTIONS, GET_PARAMETER, SET_PARAMETER, POST, GET, PUT\r\n");
+        sb.append("Audio-Jack-Status: connected; type=analog\r\n");
+        String challenge = (headers != null) ? headers.get("apple-challenge") : null;
+        if (challenge != null && !challenge.isEmpty()) {
+            String appleResp = computeAppleResponse(challenge, socket);
+            if (appleResp != null) {
+                sb.append("Apple-Response: ").append(appleResp).append("\r\n");
+                Log.i(TAG, "Apple-Challenge answered with Apple-Response (" + appleResp.length() + " chars)");
+            }
+        }
+        sb.append("Content-Length: 0\r\n\r\n");
+        out.write(sb.toString().getBytes(StandardCharsets.US_ASCII));
         out.flush();
+    }
+
+    private String computeAppleResponse(String challengeB64, Socket socket) {
+        if (RSA_N == null || RSA_D == null) {
+            Log.w(TAG, "Apple-Challenge received but RSA key is not available");
+            return null;
+        }
+        try {
+            byte[] digest = android.util.Base64.decode(challengeB64.trim(), android.util.Base64.DEFAULT);
+            byte[] ip = null;
+            if (socket != null && socket.getLocalAddress() != null && socket.getLocalAddress().getAddress().length == 4) {
+                ip = socket.getLocalAddress().getAddress();
+            }
+            if (ip == null || (ip[0] == 0 && ip[1] == 0 && ip[2] == 0 && ip[3] == 0)) {
+                ip = getLocalIpAddressBytes();
+            }
+            if (ip == null) {
+                ip = new byte[] {(byte) 192, (byte) 168, 1, 15};
+            }
+
+            byte[] mac = getHardwareMacBytes();
+
+            int digestLen = digest.length;
+            int ipLen = (ip != null) ? ip.length : 0;
+            int macLen = (mac != null) ? mac.length : 0;
+
+            int inputLen = digestLen + ipLen + macLen;
+            if (inputLen < 32) {
+                inputLen = 32;
+            }
+
+            int keyLen = 256;
+            int padLen = keyLen - inputLen - 3;
+            if (padLen < 8) {
+                Log.w(TAG, "Apple-Challenge input too long: " + inputLen);
+                return null;
+            }
+
+            byte[] buf = new byte[keyLen];
+            buf[0] = 0x00;
+            buf[1] = 0x01;
+            Arrays.fill(buf, 2, 2 + padLen, (byte) 0xFF);
+            buf[2 + padLen] = 0x00;
+
+            int pos = 3 + padLen;
+            System.arraycopy(digest, 0, buf, pos, digestLen);
+            pos += digestLen;
+            if (ip != null) {
+                System.arraycopy(ip, 0, buf, pos, ipLen);
+                pos += ipLen;
+            }
+            if (mac != null) {
+                System.arraycopy(mac, 0, buf, pos, macLen);
+                pos += macLen;
+            }
+
+            BigInteger m = new BigInteger(1, buf);
+            BigInteger s = m.modPow(RSA_D, RSA_N);
+            byte[] sBytes = s.toByteArray();
+            byte[] sig = new byte[keyLen];
+            if (sBytes.length > keyLen) {
+                System.arraycopy(sBytes, sBytes.length - keyLen, sig, 0, keyLen);
+            } else {
+                System.arraycopy(sBytes, 0, sig, keyLen - sBytes.length, sBytes.length);
+            }
+
+            return android.util.Base64.encodeToString(sig, android.util.Base64.NO_WRAP).replace("=", "").trim();
+        } catch (Throwable t) {
+            Log.w(TAG, "Apple-Challenge signing exception", t);
+            return null;
+        }
+    }
+
+    private byte[] getHardwareMacBytes() {
+        try {
+            String clean = hardwareMac.replaceAll("[^0-9A-Fa-f]", "");
+            if (clean.length() >= 12) {
+                byte[] bytes = new byte[6];
+                for (int i = 0; i < 6; i++) {
+                    bytes[i] = (byte) Integer.parseInt(clean.substring(i * 2, i * 2 + 2), 16);
+                }
+                return bytes;
+            }
+        } catch (Throwable ignored) {}
+        return new byte[] {(byte) 0xE2, 0x48, (byte) 0xCD, 0x2D, (byte) 0xCF, (byte) 0x9A};
     }
 
     private void handleServerInfo(OutputStream out, String protocol, String cseq) throws IOException {
