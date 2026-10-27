@@ -85,6 +85,7 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
 import android.view.animation.LayoutAnimationController;
+import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -201,6 +202,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     // Mango AirPlay
     private MangoAirPlayManager mangoAirPlayManager;
     private View airPlayHud;
+    private ImageView airPlayHudIcon;
     private TextView airPlayHudTitle;
     private TextView airPlayHudStatus;
     private ImageView airPlayPhotoView;
@@ -1457,8 +1459,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         dockPillBg.animate()
                 .scaleX(targetScaleX)
                 .translationX(finalTargetX)
-                .setDuration(180)
-                .setInterpolator(new DecelerateInterpolator(1.4f))
+                .setDuration(220)
+                .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                 .start();
     }
 
@@ -1512,8 +1514,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         .scaleY(1.30f)
                         .translationX(0f)
                         .translationZ(10f)
-                        .setDuration(animations ? 200 : 0)
-                        .setInterpolator(new DecelerateInterpolator(1.5f))
+                        .setDuration(animations ? 220 : 0)
+                        .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                         .start();
             } else {
                 // Neighbor cards stay at 1.0f scale, push outward
@@ -2534,6 +2536,43 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         } else {
                             airPlayVideoView.start();
                         }
+                    }
+                }
+                return true;
+            }
+        }
+
+        // If AirPlay Audio is active, intercept Media Keys to control playback on iPhone via DACP
+        if (mangoAirPlayManager != null && mangoAirPlayManager.isAirPlayActive()) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                    || code == KeyEvent.KEYCODE_HEADSETHOOK
+                    || code == KeyEvent.KEYCODE_MEDIA_PLAY
+                    || code == KeyEvent.KEYCODE_MEDIA_PAUSE
+                    || code == KeyEvent.KEYCODE_MEDIA_NEXT
+                    || code == KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                    || code == KeyEvent.KEYCODE_MEDIA_STOP) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    switch (code) {
+                        case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                        case KeyEvent.KEYCODE_HEADSETHOOK:
+                            mangoAirPlayManager.sendDacpCommand("playpause");
+                            break;
+                        case KeyEvent.KEYCODE_MEDIA_PLAY:
+                            mangoAirPlayManager.sendDacpCommand("play");
+                            break;
+                        case KeyEvent.KEYCODE_MEDIA_PAUSE:
+                            mangoAirPlayManager.sendDacpCommand("pause");
+                            break;
+                        case KeyEvent.KEYCODE_MEDIA_NEXT:
+                            mangoAirPlayManager.sendDacpCommand("nextitem");
+                            break;
+                        case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+                            mangoAirPlayManager.sendDacpCommand("previtem");
+                            break;
+                        case KeyEvent.KEYCODE_MEDIA_STOP:
+                            mangoAirPlayManager.sendDacpCommand("stop");
+                            break;
                     }
                 }
                 return true;
@@ -4052,12 +4091,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (airPodsHud.getVisibility() != View.VISIBLE) {
             airPodsHud.setVisibility(View.VISIBLE);
             airPodsHud.setAlpha(0f);
+            airPodsHud.setScaleX(0.92f);
+            airPodsHud.setScaleY(0.92f);
             airPodsHud.setTranslationY(-24f * density);
             airPodsHud.animate()
                     .alpha(1f)
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
                     .translationY(0f)
                     .setDuration(260)
-                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                     .start();
 
             preAirPodsFocusedView = getCurrentFocus();
@@ -4114,9 +4157,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         airPodsHud.animate()
                 .alpha(0f)
-                .translationY(-20f * density)
+                .scaleX(0.94f)
+                .scaleY(0.94f)
+                .translationY(-18f * density)
                 .setDuration(200)
-                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .setInterpolator(new PathInterpolator(0.7f, 0.0f, 0.84f, 0.0f))
                 .withEndAction(() -> {
                     airPodsHud.setVisibility(View.GONE);
                     focusedAirPodsButton = null;
@@ -4457,6 +4502,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void initAirPlayViews() {
         airPlayHud = findViewById(R.id.airPlayHud);
+        airPlayHudIcon = findViewById(R.id.airPlayHudIcon);
         airPlayHudTitle = findViewById(R.id.airPlayHudTitle);
         airPlayHudStatus = findViewById(R.id.airPlayHudStatus);
         airPlayPhotoView = findViewById(R.id.airPlayPhotoView);
@@ -4686,12 +4732,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (shareHud.getVisibility() != View.VISIBLE) {
             shareHud.setVisibility(View.VISIBLE);
             shareHud.setAlpha(0f);
+            shareHud.setScaleX(0.92f);
+            shareHud.setScaleY(0.92f);
             shareHud.setTranslationY(-24f * density);
             shareHud.animate()
                     .alpha(1f)
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
                     .translationY(0f)
                     .setDuration(260)
-                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                     .start();
 
             preShareFocusedView = getCurrentFocus();
@@ -4724,9 +4774,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         shareHud.animate()
                 .alpha(0f)
-                .translationY(-20f * density)
+                .scaleX(0.94f)
+                .scaleY(0.94f)
+                .translationY(-18f * density)
                 .setDuration(200)
-                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .setInterpolator(new PathInterpolator(0.7f, 0.0f, 0.84f, 0.0f))
                 .withEndAction(() -> {
                     shareHud.setVisibility(View.GONE);
                     focusedShareButton = null;
@@ -4850,10 +4902,47 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 }
 
                 @Override
+                public void onTrackMetadata(String title, String artist, String album) {
+                    runOnUiThread(() -> {
+                        if (title != null && !title.isEmpty()) {
+                            if (airPlayHudTitle != null) {
+                                airPlayHudTitle.setText(title);
+                            }
+                            String subtitle = (artist != null && !artist.isEmpty()) ? artist : "AirPlay Audio";
+                            if (album != null && !album.isEmpty()) {
+                                subtitle += " • " + album;
+                            }
+                            if (airPlayHudStatus != null) {
+                                airPlayHudStatus.setText(subtitle);
+                                airPlayHudStatus.setTextColor(0xFF34C759);
+                            }
+                            animateAirPlayHudIn();
+                            if (connectivityCoordinator != null) {
+                                connectivityCoordinator.showStatusPill("AirPlay", title + " • " + subtitle, R.drawable.ic_airplay);
+                            }
+                        }
+                    });
+                }
+
+                @Override
+                public void onArtworkReceived(Bitmap artwork) {
+                    runOnUiThread(() -> {
+                        if (airPlayHudIcon != null && artwork != null) {
+                            airPlayHudIcon.setImageBitmap(artwork);
+                            airPlayHudIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        }
+                    });
+                }
+
+                @Override
                 public void onAirPlayStopped() {
                     stopAirPlayVideo();
                     runOnUiThread(() -> {
                         dismissAirPlayHud();
+                        if (airPlayHudIcon != null) {
+                            airPlayHudIcon.setImageResource(R.drawable.ic_airplay);
+                            airPlayHudIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        }
                         if (connectivityCoordinator != null) {
                             connectivityCoordinator.dismissDialog();
                             connectivityCoordinator.dismissStatusPill();
@@ -4876,29 +4965,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         stopAirPlayVideo();
         stopMangoRemote();
         dismissAirPlayHud();
+        if (airPlayHudIcon != null) {
+            airPlayHudIcon.setImageResource(R.drawable.ic_airplay);
+            airPlayHudIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        }
         if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
     }
 
-    private void showAirPlayHud(String status, String clientName) {
+    private void animateAirPlayHudIn() {
         if (airPlayHud == null) return;
         airPlayHud.bringToFront();
-        if (airPlayHudTitle != null) {
-            airPlayHudTitle.setText("AirPlay • " + (clientName != null && !clientName.isEmpty() ? clientName : "Apple Device"));
-        }
-        if (airPlayHudStatus != null) {
-            airPlayHudStatus.setText(status);
-            airPlayHudStatus.setTextColor(0xFF34C759);
-        }
-
         if (airPlayHud.getVisibility() != View.VISIBLE) {
             airPlayHud.setVisibility(View.VISIBLE);
             airPlayHud.setAlpha(0f);
+            airPlayHud.setScaleX(0.92f);
+            airPlayHud.setScaleY(0.92f);
             airPlayHud.setTranslationY(-24f * density);
             airPlayHud.animate()
                     .alpha(1f)
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
                     .translationY(0f)
                     .setDuration(260)
-                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                     .start();
         }
 
@@ -4907,6 +4996,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         airPlayAutoDismissRunnable = this::dismissAirPlayHud;
         handler.postDelayed(airPlayAutoDismissRunnable, 8000L);
+    }
+
+    private void showAirPlayHud(String status, String clientName) {
+        if (airPlayHud == null) return;
+        if (airPlayHudTitle != null) {
+            airPlayHudTitle.setText("AirPlay • " + (clientName != null && !clientName.isEmpty() ? clientName : "Apple Device"));
+        }
+        if (airPlayHudStatus != null) {
+            airPlayHudStatus.setText(status);
+            airPlayHudStatus.setTextColor(0xFF34C759);
+        }
+        animateAirPlayHudIn();
     }
 
     private void dismissAirPlayHud() {
@@ -4918,9 +5019,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         airPlayHud.animate()
                 .alpha(0f)
-                .translationY(-20f * density)
+                .scaleX(0.94f)
+                .scaleY(0.94f)
+                .translationY(-18f * density)
                 .setDuration(200)
-                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .setInterpolator(new PathInterpolator(0.7f, 0.0f, 0.84f, 0.0f))
                 .withEndAction(() -> airPlayHud.setVisibility(View.GONE))
                 .start();
     }

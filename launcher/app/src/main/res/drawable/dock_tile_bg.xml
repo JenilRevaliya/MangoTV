@@ -1,7 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Apple-style rounded squircle for inner dock app tiles (18dp radius matching CW glass slider) -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#FF1C1C1E" />
-    <corners android:radius="18dp" />
-</shape>
+<!-- Fluid Glass Dock App Tile: Seamless borderless crystal glass with concentric squircle curvature and focus pop -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Focused State: Luminous pure white glass highlight -->
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <solid android:color="#33000000" />
+                </shape>
+            </item>
+            <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="17dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#FFFFFFFF"
+                        android:centerColor="#F5FFFFFF"
+                        android:endColor="#E6FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Normal State: 100% Seamless borderless translucent crystal glass with top specular highlight -->
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#33FFFFFF"
+                        android:centerColor="#1CFFFFFF"
+                        android:endColor="#10FFFFFF" />
+                </shape>
+            </item>
+            <item
+                android:bottom="16dp"
+                android:left="2dp"
+                android:right="2dp"
+                android:top="1.5dp">
+                <shape android:shape="rectangle">
+                    <corners
+                        android:topLeftRadius="16dp"
+                        android:topRightRadius="16dp"
+                        android:bottomLeftRadius="4dp"
+                        android:bottomRightRadius="4dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#4DFFFFFF"
+                        android:endColor="#00FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

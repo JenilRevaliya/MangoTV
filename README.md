@@ -113,6 +113,15 @@ https://github.com/user-attachments/assets/a6a6565f-cac6-4bf0-9164-c97da3fc5f47
 
 ---
 
+### Instant AirPods Case-Open Detection (Apple Ecosystem on Android TV)
+
+<div align="center">
+  <img src="assets/AirPods.GIF" width="85%" alt="AirPods Instant Case-Open Detection and Pop-up on Android TV" />
+  <p><i>Live hardware capture: Opening an AirPods case in the living room triggers an instant Apple-grade HUD card with real-time earbud and case battery levels.</i></p>
+</div>
+
+---
+
 ## Before vs After
 
 <div align="center">
@@ -190,11 +199,53 @@ https://github.com/user-attachments/assets/a6a6565f-cac6-4bf0-9164-c97da3fc5f47
 Mango TV integrates three native living room ecosystem protocols directly into the launcher through a unified, Apple TV-grade system pop-up architecture. Each feature runs with strict dormancy when disabled, consuming zero background memory and zero CPU cycles.
 
 ### 1. Mango Buds (AirPods Living Room Companion)
-* Reverse-engineered Apple Bluetooth Low Energy (BLE) protocol implementation for AirPods and AirPods Pro.
-* Living room RSSI threshold filter (-75 dBm) ensures detection only occurs within the active viewing area.
-* Manufacturer data parsing extracts verified Left, Right, and Case battery percentages and charging states.
-* Interactive pop-up card featuring high-fidelity vector case artwork, battery status pills, and focus-trapped [ Connect ] and [ Decline ] controls.
-* One-click remote pairing and seamless Bluetooth audio routing directly from the HUD.
+
+MangoTV brings Apple-grade Bluetooth proximity intelligence to the living room. When an AirPods case is opened in front of the TV, the system detects the broadcast instantly and displays an interactive, translucent glass HUD card with real-time battery status for the left earbud, right earbud, and charging case.
+
+<p align="center">
+  <a href="https://github.com/adolfintel/librepods"><img src="https://img.shields.io/badge/Upstream-LibrePods-000000?style=flat-square&logo=github&logoColor=white" alt="LibrePods GitHub" /></a>
+  <img src="https://img.shields.io/badge/Protocol-Apple%20BLE%200x004C-007AFF?style=flat-square&logo=apple&logoColor=white" alt="Apple BLE Protocol" />
+  <img src="https://img.shields.io/badge/Proximity%20Gate-%E2%89%A5%20-75%20dBm-34C759?style=flat-square" alt="Proximity Threshold" />
+  <img src="https://img.shields.io/badge/Verification-Live%20TV%20Hardware-00C853?style=flat-square&logo=android&logoColor=white" alt="Live TV Hardware Verified" />
+</p>
+
+<div align="center">
+  <img src="assets/AirPods.GIF" width="80%" alt="AirPods Instant Case-Open Detection and Pop-up on Android TV" />
+  <p><i>Live verification: Instant Apple AirPods case-open detection, live battery level decoding, and remote-controllable Bluetooth audio connection HUD on physical TV hardware.</i></p>
+</div>
+
+#### How We Achieved It: BLE Architecture and Packet Parsing
+
+Apple devices communicate proximity information through continuous Bluetooth Low Energy (BLE) manufacturer advertisements without requiring an active Bluetooth pairing session. MangoTV achieves instant case-open detection through a zero-latency passive BLE scanner and raw bitmask decoder:
+
+1. **Passive Low-Latency BLE Scanning:**
+   * Utilizes Android `BluetoothLeScanner` configured with `ScanSettings.SCAN_MODE_LOW_LATENCY` when active.
+   * Filters incoming advertisement frames by Apple Inc. SIG manufacturer identifier (`0x004C`).
+   * Runs with zero background allocation overhead, consuming 0% CPU cycles when dormant.
+
+2. **Living Room Proximity Gating (RSSI Filter):**
+   * Employs a strict Received Signal Strength Indication (RSSI) gate calibrated at `-75 dBm`.
+   * Discards distant broadcasts from neighboring rooms or hallways, ensuring the prompt appears exclusively when an occupant is sitting in the immediate viewing area.
+
+3. **Packet Protocol Decoding:**
+   * Validates Apple Proximity Pairing beacon header (`0x07` sub-type, 27-byte packet payload).
+   * Identifies device model identifiers across AirPods Gen 1/2/3/4, AirPods Pro Gen 1/2, and AirPods Max.
+   * Extracts byte-level battery percentages and status flags:
+     * **Left Earbud Battery:** High nibble of byte offset 6 (0 to 10 scale mapped to 0% to 100%, with `0x0F` indicating disconnected or in-ear state).
+     * **Right Earbud Battery:** Low nibble of byte offset 6 (0 to 10 scale mapped to 0% to 100%).
+     * **Case Battery:** High nibble of byte offset 7 (0 to 10 scale mapped to 0% to 100%).
+     * **Charging Bitmask:** Decodes byte offset 8 bitflags to detect real-time charging status for Left, Right, and Case independently.
+     * **Lid Status Bit:** Monitors lid open and closed state transitions to trigger prompt entrance and exit animations instantly.
+
+4. **Apple-Grade HUD Interface and Remote Navigation:**
+   * Slides in a translucent liquid glass card (`#E6151518`) with 26dp corner radius and subtle specular illumination.
+   * Focus-traps the TV remote on the `[ Connect ]` button with D-pad Left and Right navigation to `[ Decline ]`.
+   * Selecting `[ Connect ]` automatically initiates Bluetooth bonding and switches TV audio output to the AirPods.
+   * Selecting `[ Decline ]` enforces a 5-minute suppression cooldown to eliminate notification fatigue.
+
+#### Open Source Attribution and Credits
+
+Special credit and gratitude to the open-source **[LibrePods](https://github.com/adolfintel/librepods)** project created by Kavish Devar and contributors. LibrePods pioneered the reverse-engineering of Apple AirPods BLE continuity advertisement structures and battery packet bitmasks on Android. Their documented protocol research and beacon parsing specifications made this living room integration possible in MangoTV.
 
 ### 2. Mango Share (LocalSend Protocol Receiver)
 * Built on the LocalSend v2 open protocol standard for high-speed local network file transfers.

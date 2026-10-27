@@ -10,6 +10,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.PathInterpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -208,12 +209,14 @@ public class MangoConnectivityCoordinator {
         if (btnPrimary != null) {
             btnPrimary.setOnClickListener(v -> handlePrimaryAction());
             btnPrimary.setOnFocusChangeListener((v, hasFocus) -> {
+                btnPrimary.setTextColor(hasFocus ? 0xFF000000 : 0xFFFFFFFF);
                 if (hasFocus && listener != null) listener.playNavSound();
             });
         }
         if (btnSecondary != null) {
             btnSecondary.setOnClickListener(v -> handleSecondaryAction());
             btnSecondary.setOnFocusChangeListener((v, hasFocus) -> {
+                btnSecondary.setTextColor(hasFocus ? 0xFF000000 : 0xB3FFFFFF);
                 if (hasFocus && listener != null) listener.playNavSound();
             });
         }
@@ -497,12 +500,16 @@ public class MangoConnectivityCoordinator {
         currentPriority = PRIORITY_STATUS_PILL;
         statusPill.setVisibility(View.VISIBLE);
         statusPill.setAlpha(0f);
+        statusPill.setScaleX(0.92f);
+        statusPill.setScaleY(0.92f);
         statusPill.setTranslationY(-20f);
         statusPill.animate()
                 .alpha(1f)
+                .scaleX(1.0f)
+                .scaleY(1.0f)
                 .translationY(0f)
-                .setDuration(240)
-                .setInterpolator(new DecelerateInterpolator(1.6f))
+                .setDuration(260)
+                .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                 .start();
 
         if (pillDismissRunnable != null) handler.removeCallbacks(pillDismissRunnable);
@@ -519,9 +526,11 @@ public class MangoConnectivityCoordinator {
 
         statusPill.animate()
                 .alpha(0f)
+                .scaleX(0.94f)
+                .scaleY(0.94f)
                 .translationY(-16f)
                 .setDuration(200)
-                .setInterpolator(new AccelerateInterpolator(1.4f))
+                .setInterpolator(new PathInterpolator(0.7f, 0.0f, 0.84f, 0.0f))
                 .withEndAction(() -> {
                     statusPill.setVisibility(View.GONE);
                     if (currentPriority == PRIORITY_STATUS_PILL) {
@@ -654,16 +663,16 @@ public class MangoConnectivityCoordinator {
     private void animateInCard() {
         if (card != null) {
             card.setAlpha(0f);
-            card.setScaleX(0.95f);
-            card.setScaleY(0.95f);
+            card.setScaleX(0.93f);
+            card.setScaleY(0.93f);
             card.setTranslationY(-24f);
             card.animate()
                     .alpha(1f)
                     .scaleX(1.0f)
                     .scaleY(1.0f)
                     .translationY(0f)
-                    .setDuration(250)
-                    .setInterpolator(new DecelerateInterpolator(1.6f))
+                    .setDuration(260)
+                    .setInterpolator(new PathInterpolator(0.34f, 1.56f, 0.64f, 1.0f))
                     .withEndAction(() -> {
                         if (btnPrimary != null && btnPrimary.isAttachedToWindow()) {
                             btnPrimary.requestFocus();
@@ -690,11 +699,11 @@ public class MangoConnectivityCoordinator {
         if (card != null) {
             card.animate()
                     .alpha(0f)
-                    .scaleX(0.96f)
-                    .scaleY(0.96f)
+                    .scaleX(0.94f)
+                    .scaleY(0.94f)
                     .translationY(16f)
-                    .setDuration(180)
-                    .setInterpolator(new AccelerateInterpolator(1.4f))
+                    .setDuration(200)
+                    .setInterpolator(new PathInterpolator(0.7f, 0.0f, 0.84f, 0.0f))
                     .withEndAction(() -> {
                         if (overlayRoot != null) overlayRoot.setVisibility(View.GONE);
                         currentPriority = PRIORITY_NONE;

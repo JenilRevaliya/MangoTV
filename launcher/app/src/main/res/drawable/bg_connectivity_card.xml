@@ -1,9 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#E6151518" />
-    <corners android:radius="26dp" />
-    <stroke
-        android:width="1dp"
-        android:color="#33FFFFFF" />
-</shape>
+<!-- Fluid Glass Modal Card: Borderless clean glass with soft ambient shadow (Settings-like UI) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Layer 0: Minor Ambient Drop Shadow Layer (Offset down 4dp) -->
+    <item
+        android:bottom="0dp"
+        android:left="0dp"
+        android:right="0dp"
+        android:top="4dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="28dp" />
+            <solid android:color="#4D000000" />
+        </shape>
+    </item>
+
+    <!-- Layer 1: Seamless Crystal Clear Liquid Glass Body (NO BORDERS) -->
+    <item
+        android:bottom="4dp"
+        android:left="0dp"
+        android:right="0dp"
+        android:top="0dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="28dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#33FFFFFF"
+                android:centerColor="#20FFFFFF"
+                android:endColor="#14FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

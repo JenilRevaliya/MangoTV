@@ -1,24 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fluid Glass Settings Card: Borderless clean glass with soft ambient shadow and focus illumination -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
-        <shape android:shape="rectangle">
-            <corners android:radius="18dp" />
-            <solid android:color="#36FFFFFF" />
-            <stroke android:width="2dp" android:color="#FFFFFFFF" />
-        </shape>
+        <layer-list>
+            <item
+                android:bottom="0dp"
+                android:left="0dp"
+                android:right="0dp"
+                android:top="3dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <solid android:color="#4D000000" />
+                </shape>
+            </item>
+            <item
+                android:bottom="3dp"
+                android:left="0dp"
+                android:right="0dp"
+                android:top="0dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#FFFFFFFF"
+                        android:centerColor="#FAFBFD"
+                        android:endColor="#F2F4F7" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
     <item android:state_selected="true">
-        <shape android:shape="rectangle">
-            <corners android:radius="18dp" />
-            <solid android:color="#2AFFFFFF" />
-            <stroke android:width="1.5dp" android:color="#80FFFFFF" />
-        </shape>
+        <layer-list>
+            <item
+                android:bottom="0dp"
+                android:left="0dp"
+                android:right="0dp"
+                android:top="2dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <solid android:color="#33000000" />
+                </shape>
+            </item>
+            <item
+                android:bottom="2dp"
+                android:left="0dp"
+                android:right="0dp"
+                android:top="0dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#3DFFFFFF"
+                        android:endColor="#22FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
     <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="18dp" />
-            <solid android:color="#14FFFFFF" />
-            <stroke android:width="1dp" android:color="#1CFFFFFF" />
-        </shape>
+        <layer-list>
+            <item
+                android:bottom="0dp"
+                android:left="0dp"
+                android:right="0dp"
+                android:top="2dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <solid android:color="#33000000" />
+                </shape>
+            </item>
+            <item
+                android:bottom="2dp"
+                android:left="0dp"
+                android:right="0dp"
+                android:top="0dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#2EFFFFFF"
+                        android:centerColor="#1EFFFFFF"
+                        android:endColor="#12FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </selector>

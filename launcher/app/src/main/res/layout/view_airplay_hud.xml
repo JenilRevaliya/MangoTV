@@ -17,9 +17,10 @@
 
     <ImageView
         android:id="@+id/airPlayHudIcon"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
         android:contentDescription="AirPlay"
+        android:scaleType="fitCenter"
         android:src="@drawable/ic_airplay" />
 
     <LinearLayout
@@ -31,9 +32,11 @@
 
         <TextView
             android:id="@+id/airPlayHudTitle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:ellipsize="end"
             android:text="AirPlay"
             android:textColor="#FFFFFFFF"
             android:textSize="15sp"
@@ -41,10 +44,12 @@
 
         <TextView
             android:id="@+id/airPlayHudStatus"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="1dp"
             android:fontFamily="sans-serif"
+            android:singleLine="true"
+            android:ellipsize="end"
             android:text="Connected • Ready"
             android:textColor="#FF34C759"
             android:textSize="12sp" />

@@ -157,6 +157,8 @@ public class MangoAirPlayManager {
         void onVideoPlayRequested(String videoUrl, float startPosition);
         void onPlaybackRateChanged(float rate);
         void onPlaybackScrub(float position);
+        void onTrackMetadata(String title, String artist, String album);
+        void onArtworkReceived(Bitmap artwork);
         void onAirPlayStopped();
     }
 
@@ -193,6 +195,39 @@ public class MangoAirPlayManager {
     private BluetoothLeAdvertiser bleAdvertiser;
     private AdvertiseCallback bleAdvertiseCallback;
     private final AirPlayAudioPlayer audioPlayer = new AirPlayAudioPlayer();
+    private volatile String dacpId;
+    private volatile String activeRemote;
+    private volatile String activeClientIp;
+
+    public boolean isAudioPlaying() {
+        return audioPlayer.isPlaying();
+    }
+
+    public boolean isAirPlayActive() {
+        return audioPlayer.isPlaying() || activeRemote != null;
+    }
+
+    public void sendDacpCommand(String command) {
+        final String ip = activeClientIp;
+        final String token = activeRemote;
+        if (threadPool == null || ip == null || token == null) return;
+        threadPool.execute(() -> {
+            try {
+                java.net.URL url = new java.net.URL("http://" + ip + ":3689/ctrl-int/1/" + command + "?active-remote-token=" + token);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(2000);
+                conn.setReadTimeout(2000);
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", "iTunes/12.0");
+                conn.connect();
+                int code = conn.getResponseCode();
+                conn.disconnect();
+                Log.i(TAG, "Sent DACP command " + command + " to " + ip + ", status: " + code);
+            } catch (Throwable t) {
+                Log.w(TAG, "DACP command " + command + " error: " + t.getMessage());
+            }
+        });
+    }
 
     public MangoAirPlayManager(Context context, String serverName) {
         this.context = context.getApplicationContext();
@@ -252,6 +287,8 @@ public class MangoAirPlayManager {
         unregisterMdnsServices();
         stopUdpAudioSockets();
         audioPlayer.stop();
+        activeRemote = null;
+        activeClientIp = null;
 
         if (multicastLock != null) {
             try {
@@ -464,6 +501,42 @@ public class MangoAirPlayManager {
         });
     }
 
+    private void parseDmapMetadata(byte[] data) {
+        if (data == null || data.length < 8) return;
+        String title = null;
+        String artist = null;
+        String album = null;
+
+        for (int i = 0; i <= data.length - 8; i++) {
+            if (data[i] == 'm' && data[i + 1] == 'i' && data[i + 2] == 'n' && data[i + 3] == 'm') {
+                int len = ((data[i + 4] & 0xFF) << 24) | ((data[i + 5] & 0xFF) << 16) | ((data[i + 6] & 0xFF) << 8) | (data[i + 7] & 0xFF);
+                if (len > 0 && i + 8 + len <= data.length) {
+                    try { title = new String(data, i + 8, len, StandardCharsets.UTF_8); } catch (Throwable ignored) {}
+                }
+            } else if (data[i] == 'a' && data[i + 1] == 's' && data[i + 2] == 'a' && data[i + 3] == 'r') {
+                int len = ((data[i + 4] & 0xFF) << 24) | ((data[i + 5] & 0xFF) << 16) | ((data[i + 6] & 0xFF) << 8) | (data[i + 7] & 0xFF);
+                if (len > 0 && i + 8 + len <= data.length) {
+                    try { artist = new String(data, i + 8, len, StandardCharsets.UTF_8); } catch (Throwable ignored) {}
+                }
+            } else if (data[i] == 'a' && data[i + 1] == 's' && data[i + 2] == 'a' && data[i + 3] == 'l') {
+                int len = ((data[i + 4] & 0xFF) << 24) | ((data[i + 5] & 0xFF) << 16) | ((data[i + 6] & 0xFF) << 8) | (data[i + 7] & 0xFF);
+                if (len > 0 && i + 8 + len <= data.length) {
+                    try { album = new String(data, i + 8, len, StandardCharsets.UTF_8); } catch (Throwable ignored) {}
+                }
+            }
+        }
+
+        if (title != null || artist != null || album != null) {
+            final String fTitle = title;
+            final String fArtist = artist;
+            final String fAlbum = album;
+            Log.i(TAG, "AirPlay Track Metadata: title=" + fTitle + ", artist=" + fArtist + ", album=" + fAlbum);
+            mainHandler.post(() -> {
+                if (listener != null) listener.onTrackMetadata(fTitle, fArtist, fAlbum);
+            });
+        }
+    }
+
     private static void writeLongBE(byte[] b, int offset, long val) {
         b[offset]     = (byte) ((val >> 56) & 0xFF);
         b[offset + 1] = (byte) ((val >> 48) & 0xFF);
@@ -526,6 +599,14 @@ public class MangoAirPlayManager {
                     try {
                         contentLength = Long.parseLong(cl);
                     } catch (NumberFormatException ignored) {}
+                }
+
+                String ar = headers.get("active-remote");
+                if (ar != null && !ar.isEmpty()) activeRemote = ar;
+                String did = headers.get("dacp-id");
+                if (did != null && !did.isEmpty()) dacpId = did;
+                if (socket.getInetAddress() != null) {
+                    activeClientIp = socket.getInetAddress().getHostAddress();
                 }
 
                 String userAgent = headers.get("user-agent");
@@ -687,8 +768,12 @@ public class MangoAirPlayManager {
                 } else if ("RECORD".equals(method)) {
                     isRtspAudioSession = true;
                     audioPlayer.initTrack();
+                    audioPlayer.resume();
                     mainHandler.post(() -> {
-                        if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName + " • Playing Audio");
+                        if (listener != null) {
+                            listener.onAirPlayClientConnected(clientIp, clientName + " • Playing Audio");
+                            listener.onPlaybackRateChanged(1.0f);
+                        }
                     });
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
                     StringBuilder respSb = new StringBuilder();
@@ -702,6 +787,21 @@ public class MangoAirPlayManager {
                         String appleResp = computeAppleResponse(challenge, socket);
                         if (appleResp != null) respSb.append("Apple-Response: ").append(appleResp).append("\r\n");
                     }
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                } else if ("PAUSE".equals(method)) {
+                    isRtspAudioSession = true;
+                    audioPlayer.pause();
+                    mainHandler.post(() -> {
+                        if (listener != null) listener.onPlaybackRateChanged(0.0f);
+                    });
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Session: 1\r\n");
                     respSb.append("Content-Length: 0\r\n\r\n");
                     out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
                     out.flush();
@@ -720,17 +820,30 @@ public class MangoAirPlayManager {
                     out.write(bodyBytes);
                     out.flush();
                 } else if ("SET_PARAMETER".equals(method)) {
-                    if (contentLength > 0 && contentLength < 65536) {
+                    String contentType = headers.get("content-type");
+                    if (contentLength > 0 && contentLength < 10 * 1024 * 1024) {
                         byte[] bodyBytes = readExactBytes(in, (int) contentLength);
-                        String param = new String(bodyBytes, StandardCharsets.UTF_8);
                         bodyHandled = true;
-                        int idx = param.indexOf("volume:");
-                        if (idx >= 0) {
-                            try {
-                                float vol = Float.parseFloat(param.substring(idx + 7).trim());
-                                audioPlayer.setVolume(vol);
-                                Log.i(TAG, "AirPlay audio volume set: " + vol + " dB");
-                            } catch (Throwable ignored) {}
+                        if (contentType != null && contentType.startsWith("image/")) {
+                            Bitmap art = BitmapFactory.decodeByteArray(bodyBytes, 0, bodyBytes.length);
+                            if (art != null) {
+                                Log.i(TAG, "AirPlay album artwork received: " + art.getWidth() + "x" + art.getHeight());
+                                mainHandler.post(() -> {
+                                    if (listener != null) listener.onArtworkReceived(art);
+                                });
+                            }
+                        } else if (contentType != null && contentType.contains("dmap")) {
+                            parseDmapMetadata(bodyBytes);
+                        } else {
+                            String param = new String(bodyBytes, StandardCharsets.UTF_8);
+                            int idx = param.indexOf("volume:");
+                            if (idx >= 0) {
+                                try {
+                                    float vol = Float.parseFloat(param.substring(idx + 7).trim());
+                                    audioPlayer.setVolume(vol);
+                                    Log.i(TAG, "AirPlay audio volume set: " + vol + " dB");
+                                } catch (Throwable ignored) {}
+                            }
                         }
                     }
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
@@ -755,6 +868,8 @@ public class MangoAirPlayManager {
                     out.flush();
                 } else if ("TEARDOWN".equals(method)) {
                     audioPlayer.stop();
+                    activeRemote = null;
+                    activeClientIp = null;
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayStopped();
                     });
@@ -785,6 +900,8 @@ public class MangoAirPlayManager {
             } catch (Throwable ignored) {}
             if (isRtspAudioSession) {
                 audioPlayer.stop();
+                activeRemote = null;
+                activeClientIp = null;
                 mainHandler.post(() -> {
                     if (listener != null) listener.onAirPlayStopped();
                 });
@@ -793,6 +910,15 @@ public class MangoAirPlayManager {
     }
 
     private void handleOptions(OutputStream out, String protocol, String cseq, Map<String, String> headers, Socket socket) throws IOException {
+        if (headers != null) {
+            String ar = headers.get("active-remote");
+            if (ar != null && !ar.isEmpty()) activeRemote = ar;
+            String did = headers.get("dacp-id");
+            if (did != null && !did.isEmpty()) dacpId = did;
+            if (socket != null && socket.getInetAddress() != null) {
+                activeClientIp = socket.getInetAddress().getHostAddress();
+            }
+        }
         String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
         StringBuilder sb = new StringBuilder();
         sb.append(proto).append(" 200 OK\r\n");

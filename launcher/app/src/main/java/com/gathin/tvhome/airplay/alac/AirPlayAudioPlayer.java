@@ -240,6 +240,28 @@ public class AirPlayAudioPlayer {
         }
     }
 
+    public synchronized boolean isPlaying() {
+        return isPlaying;
+    }
+
+    public synchronized void pause() {
+        if (audioTrack != null && isPlaying) {
+            try {
+                audioTrack.pause();
+                isPlaying = false;
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    public synchronized void resume() {
+        if (audioTrack != null && !isPlaying) {
+            try {
+                audioTrack.play();
+                isPlaying = true;
+            } catch (Throwable ignored) {}
+        }
+    }
+
     public synchronized void stop() {
         isPlaying = false;
         if (audioTrack != null) {

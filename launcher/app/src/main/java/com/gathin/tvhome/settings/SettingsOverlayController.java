@@ -6,12 +6,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.PorterDuff;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -45,8 +47,14 @@ public final class SettingsOverlayController {
     // Connectivity Cards
     private final View cardWifi;
     private final View cardBluetooth;
+    private final ImageView iconWifi;
+    private final ImageView chevronWifi;
+    private final TextView textWifiTitle;
     private final TextView textWifiStatus;
     private final TextView textWifiSsid;
+    private final ImageView iconBluetooth;
+    private final ImageView chevronBluetooth;
+    private final TextView textBtTitle;
     private final TextView textBtStatus;
     private final TextView textBtDevices;
 
@@ -64,6 +72,9 @@ public final class SettingsOverlayController {
     private final View rowDisplay;
     private final View rowPrivacy;
     private final View rowDevice;
+    private final ImageView iconDevice;
+    private final TextView textDeviceTitle;
+    private final ImageView chevronDevice;
 
     // Dynamic QR Modal
     private final FrameLayout qrModal;
@@ -88,8 +99,15 @@ public final class SettingsOverlayController {
 
         this.cardWifi = overlayRoot.findViewById(R.id.cardSettingsWifi);
         this.cardBluetooth = overlayRoot.findViewById(R.id.cardSettingsBluetooth);
+        this.iconWifi = overlayRoot.findViewById(R.id.iconSettingsWifi);
+        this.chevronWifi = overlayRoot.findViewById(R.id.chevronSettingsWifi);
+        this.textWifiTitle = overlayRoot.findViewById(R.id.textSettingsWifiTitle);
         this.textWifiStatus = overlayRoot.findViewById(R.id.textSettingsWifiStatus);
         this.textWifiSsid = overlayRoot.findViewById(R.id.textSettingsWifiSsid);
+
+        this.iconBluetooth = overlayRoot.findViewById(R.id.iconSettingsBluetooth);
+        this.chevronBluetooth = overlayRoot.findViewById(R.id.chevronSettingsBluetooth);
+        this.textBtTitle = overlayRoot.findViewById(R.id.textSettingsBtTitle);
         this.textBtStatus = overlayRoot.findViewById(R.id.textSettingsBtStatus);
         this.textBtDevices = overlayRoot.findViewById(R.id.textSettingsBtDevices);
 
@@ -105,6 +123,9 @@ public final class SettingsOverlayController {
         this.rowDisplay = overlayRoot.findViewById(R.id.rowSettingsDisplay);
         this.rowPrivacy = overlayRoot.findViewById(R.id.rowSettingsPrivacy);
         this.rowDevice = overlayRoot.findViewById(R.id.rowSettingsDevice);
+        this.iconDevice = overlayRoot.findViewById(R.id.iconSettingsDevice);
+        this.textDeviceTitle = overlayRoot.findViewById(R.id.textSettingsDeviceTitle);
+        this.chevronDevice = overlayRoot.findViewById(R.id.chevronSettingsDevice);
 
         this.qrModal = overlayRoot.findViewById(R.id.settingsQrModal);
         this.qrImageView = overlayRoot.findViewById(R.id.settingsQrImageView);
@@ -115,6 +136,10 @@ public final class SettingsOverlayController {
 
         bindListeners();
         setupFocusScales();
+
+        updateWifiCardAppearance(false);
+        updateBtCardAppearance(false);
+        updateDeviceRowAppearance(false);
     }
 
     public void setOnDismissListener(Runnable listener) {
@@ -175,14 +200,24 @@ public final class SettingsOverlayController {
                 float targetScale = 1.0f;
                 if (hasFocus) {
                     if (view == btnClose) {
-                        targetScale = 1.10f;
+                        targetScale = 1.08f;
                     } else if (view == btnQrRegenerate || view == btnQrDone) {
-                        targetScale = 1.05f;
+                        targetScale = 1.04f;
                     } else {
-                        targetScale = 1.02f;
+                        targetScale = 1.0f; // Tiles and rows stay strictly within boundary
                     }
                 }
-                view.animate().scaleX(targetScale).scaleY(targetScale).setDuration(160).start();
+                if (targetScale != 1.0f || view.getScaleX() != 1.0f) {
+                    view.animate().scaleX(targetScale).scaleY(targetScale).setDuration(160).start();
+                }
+
+                if (view == cardWifi) {
+                    updateWifiCardAppearance(hasFocus);
+                } else if (view == cardBluetooth) {
+                    updateBtCardAppearance(hasFocus);
+                } else if (view == rowDevice) {
+                    updateDeviceRowAppearance(hasFocus);
+                }
             });
         }
     }
@@ -194,6 +229,7 @@ public final class SettingsOverlayController {
         refreshState();
         overlayRoot.setVisibility(View.VISIBLE);
         cardWifi.requestFocus();
+        updateWifiCardAppearance(true);
 
         scrim.setAlpha(0f);
         scrim.animate()
@@ -205,11 +241,15 @@ public final class SettingsOverlayController {
         float slideDistance = panel.getWidth() > 0 ? panel.getWidth() + 80f : 500f;
         panel.setTranslationX(slideDistance);
         panel.setAlpha(0f);
+        panel.setScaleX(0.96f);
+        panel.setScaleY(0.96f);
         panel.animate()
                 .translationX(0f)
                 .alpha(1f)
+                .scaleX(1.0f)
+                .scaleY(1.0f)
                 .setDuration(280)
-                .setInterpolator(new DecelerateInterpolator())
+                .setInterpolator(new PathInterpolator(0.16f, 1.0f, 0.3f, 1.0f))
                 .start();
     }
 
@@ -232,8 +272,10 @@ public final class SettingsOverlayController {
         panel.animate()
                 .translationX(slideDistance)
                 .alpha(0f)
-                .setDuration(240)
-                .setInterpolator(new AccelerateInterpolator())
+                .scaleX(0.96f)
+                .scaleY(0.96f)
+                .setDuration(220)
+                .setInterpolator(new PathInterpolator(0.7f, 0.0f, 0.84f, 0.0f))
                 .withEndAction(() -> {
                     overlayRoot.setVisibility(View.GONE);
                     if (onDismissListener != null) {
@@ -293,13 +335,12 @@ public final class SettingsOverlayController {
         // Wi-Fi State
         SystemConnectivityHelper.WifiState wifi = SystemConnectivityHelper.getWifiState(activity);
         textWifiStatus.setText(wifi.isConnected ? "Connected" : "Disconnected");
-        textWifiStatus.setTextColor(wifi.isConnected ? 0xFF34C759 : 0xFFA1A1A6);
         textWifiSsid.setText(wifi.ssid != null ? wifi.ssid : "Unavailable");
+        updateWifiCardAppearance(cardWifi != null && cardWifi.hasFocus());
 
         // Bluetooth State
         SystemConnectivityHelper.BtState bt = SystemConnectivityHelper.getBluetoothState(activity);
         textBtStatus.setText(bt.isEnabled ? "On" : "Off");
-        textBtStatus.setTextColor(bt.isEnabled ? 0xFF34C759 : 0xFFA1A1A6);
         int connectedCount = bt.connectedDeviceNames != null ? bt.connectedDeviceNames.size() : 0;
         if (connectedCount > 0) {
             textBtDevices.setText(connectedCount + (connectedCount == 1 ? " device connected" : " devices connected"));
@@ -308,6 +349,8 @@ public final class SettingsOverlayController {
         } else {
             textBtDevices.setText("0 devices connected");
         }
+        updateBtCardAppearance(cardBluetooth != null && cardBluetooth.hasFocus());
+        updateDeviceRowAppearance(rowDevice != null && rowDevice.hasFocus());
 
         // Mango Feature switches
         boolean shareOn = choices.getBoolean("mango_share_enabled", true);
@@ -320,6 +363,60 @@ public final class SettingsOverlayController {
 
         int pairedCount = pairingManager.getPairedDeviceCount();
         textRemoteSub.setText(pairedCount > 0 ? (pairedCount + " devices paired") : "Pair your phone");
+    }
+
+    private void updateWifiCardAppearance(boolean hasFocus) {
+        SystemConnectivityHelper.WifiState wifi = SystemConnectivityHelper.getWifiState(activity);
+        if (hasFocus) {
+            if (iconWifi != null) iconWifi.setColorFilter(0xFF000000, PorterDuff.Mode.SRC_IN);
+            if (chevronWifi != null) chevronWifi.setColorFilter(0x80000000, PorterDuff.Mode.SRC_IN);
+            if (textWifiTitle != null) textWifiTitle.setTextColor(0xFF000000);
+            if (textWifiStatus != null) {
+                textWifiStatus.setTextColor(wifi.isConnected ? 0xFF1C7C33 : 0xCC000000);
+            }
+            if (textWifiSsid != null) textWifiSsid.setTextColor(0x99000000);
+        } else {
+            if (iconWifi != null) iconWifi.setColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN);
+            if (chevronWifi != null) chevronWifi.setColorFilter(0x80FFFFFF, PorterDuff.Mode.SRC_IN);
+            if (textWifiTitle != null) textWifiTitle.setTextColor(0xFFFFFFFF);
+            if (textWifiStatus != null) {
+                textWifiStatus.setTextColor(wifi.isConnected ? 0xFF34C759 : 0xE6FFFFFF);
+            }
+            if (textWifiSsid != null) textWifiSsid.setTextColor(0xB3FFFFFF);
+        }
+    }
+
+    private void updateBtCardAppearance(boolean hasFocus) {
+        SystemConnectivityHelper.BtState bt = SystemConnectivityHelper.getBluetoothState(activity);
+        if (hasFocus) {
+            if (iconBluetooth != null) iconBluetooth.setColorFilter(0xFF000000, PorterDuff.Mode.SRC_IN);
+            if (chevronBluetooth != null) chevronBluetooth.setColorFilter(0x80000000, PorterDuff.Mode.SRC_IN);
+            if (textBtTitle != null) textBtTitle.setTextColor(0xFF000000);
+            if (textBtStatus != null) {
+                textBtStatus.setTextColor(bt.isEnabled ? 0xFF1C7C33 : 0xCC000000);
+            }
+            if (textBtDevices != null) textBtDevices.setTextColor(0x99000000);
+        } else {
+            if (iconBluetooth != null) iconBluetooth.setColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN);
+            if (chevronBluetooth != null) chevronBluetooth.setColorFilter(0x80FFFFFF, PorterDuff.Mode.SRC_IN);
+            if (textBtTitle != null) textBtTitle.setTextColor(0xFFFFFFFF);
+            if (textBtStatus != null) {
+                textBtStatus.setTextColor(bt.isEnabled ? 0xFF34C759 : 0xE6FFFFFF);
+            }
+            if (textBtDevices != null) textBtDevices.setTextColor(0xB3FFFFFF);
+        }
+    }
+
+    private void updateDeviceRowAppearance(boolean hasFocus) {
+        if (hasFocus) {
+            if (iconDevice != null) iconDevice.setColorFilter(0xFF000000, PorterDuff.Mode.SRC_IN);
+            if (chevronDevice != null) chevronDevice.setColorFilter(0x80000000, PorterDuff.Mode.SRC_IN);
+            if (textDeviceTitle != null) textDeviceTitle.setTextColor(0xFF000000);
+        } else {
+            if (iconDevice != null) iconDevice.setColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN);
+            if (chevronDevice != null) chevronDevice.setColorFilter(0x80FFFFFF, PorterDuff.Mode.SRC_IN);
+            if (textDeviceTitle != null) textDeviceTitle.setTextColor(0xFFFFFFFF);
+        }
     }
 
     private void showQrPairingDialog() {

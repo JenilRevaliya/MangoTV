@@ -1,16 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fluid Glass Primary Button: Borderless luminous white glass on focus, frosted translucent glass normally -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="22dp" />
+                    <solid android:color="#33000000" />
+                </shape>
+            </item>
+            <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="21dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#FFFFFFFF"
+                        android:centerColor="#F5FFFFFF"
+                        android:endColor="#E6FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <corners android:radius="20dp" />
-            <solid android:color="#FFFFFFFF" />
-            <stroke android:width="2dp" android:color="#FF34C759" />
+            <corners android:radius="22dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#F0FFFFFF"
+                android:endColor="#D9FFFFFF" />
         </shape>
     </item>
     <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="20dp" />
-            <solid android:color="#E6FFFFFF" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="22dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#F0FFFFFF"
+                        android:centerColor="#E6FFFFFF"
+                        android:endColor="#D9FFFFFF" />
+                </shape>
+            </item>
+            <item android:bottom="14dp" android:left="2dp" android:right="2dp" android:top="1dp">
+                <shape android:shape="rectangle">
+                    <corners
+                        android:topLeftRadius="20dp"
+                        android:topRightRadius="20dp"
+                        android:bottomLeftRadius="4dp"
+                        android:bottomRightRadius="4dp" />
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#4DFFFFFF"
+                        android:endColor="#00FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </selector>
