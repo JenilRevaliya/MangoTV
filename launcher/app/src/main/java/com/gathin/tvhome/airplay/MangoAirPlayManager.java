@@ -24,22 +24,30 @@ import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.math.BigInteger;
+import java.security.KeyFactory;
 import java.security.MessageDigest;
+import java.security.PrivateKey;
+import java.security.spec.RSAPrivateCrtKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.crypto.Cipher;
+
+import com.gathin.tvhome.airplay.alac.AirPlayAudioPlayer;
 
 /**
  * Native AirPlay 1 & 2 compatible media receiver for Mango TV.
@@ -83,6 +91,7 @@ public class MangoAirPlayManager {
 
     private static BigInteger RSA_N;
     private static BigInteger RSA_D;
+    private static PrivateKey rsaPrivateKey;
 
     static {
         try {
@@ -97,7 +106,7 @@ public class MangoAirPlayManager {
                 }
             }
             List<byte[]> ints = new ArrayList<>();
-            while (idx < der.length && ints.size() < 4) {
+            while (idx < der.length && ints.size() < 9) {
                 if ((der[idx] & 0xFF) == 0x02) {
                     idx++;
                     int len;
@@ -120,9 +129,21 @@ public class MangoAirPlayManager {
                     break;
                 }
             }
-            if (ints.size() >= 4) {
+            if (ints.size() >= 9) {
                 RSA_N = new BigInteger(1, ints.get(1));
                 RSA_D = new BigInteger(1, ints.get(3));
+                RSAPrivateCrtKeySpec spec = new RSAPrivateCrtKeySpec(
+                        RSA_N,
+                        new BigInteger(1, ints.get(2)), // e
+                        RSA_D,                          // d
+                        new BigInteger(1, ints.get(4)), // p
+                        new BigInteger(1, ints.get(5)), // q
+                        new BigInteger(1, ints.get(6)), // dP
+                        new BigInteger(1, ints.get(7)), // dQ
+                        new BigInteger(1, ints.get(8))  // qInv
+                );
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                rsaPrivateKey = kf.generatePrivate(spec);
                 Log.i(TAG, "AirPort Express RSA private key loaded successfully (" + RSA_N.bitLength() + " bits)");
             }
         } catch (Throwable t) {
@@ -157,11 +178,13 @@ public class MangoAirPlayManager {
 
     private static final int RTP_AUDIO_PORT = 6000;
     private static final int RTP_CONTROL_PORT = 6001;
+    private static final int RTP_TIMING_PORT = 6002;
 
     private boolean isRunning = false;
     private ServerSocket serverSocket;
     private DatagramSocket rtpAudioSocket;
     private DatagramSocket rtpControlSocket;
+    private DatagramSocket rtpTimingSocket;
     private ExecutorService threadPool;
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener airplayRegListener;
@@ -169,6 +192,7 @@ public class MangoAirPlayManager {
     private WifiManager.MulticastLock multicastLock;
     private BluetoothLeAdvertiser bleAdvertiser;
     private AdvertiseCallback bleAdvertiseCallback;
+    private final AirPlayAudioPlayer audioPlayer = new AirPlayAudioPlayer();
 
     public MangoAirPlayManager(Context context, String serverName) {
         this.context = context.getApplicationContext();
@@ -227,6 +251,7 @@ public class MangoAirPlayManager {
         stopBleBeacon();
         unregisterMdnsServices();
         stopUdpAudioSockets();
+        audioPlayer.stop();
 
         if (multicastLock != null) {
             try {
@@ -278,13 +303,26 @@ public class MangoAirPlayManager {
         if (threadPool == null) return;
         threadPool.execute(() -> {
             try {
-                rtpAudioSocket = new DatagramSocket(RTP_AUDIO_PORT);
-                rtpAudioSocket.setReceiveBufferSize(256 * 1024);
+                if (rtpAudioSocket != null && !rtpAudioSocket.isClosed()) {
+                    rtpAudioSocket.close();
+                }
+                rtpAudioSocket = new DatagramSocket(null);
+                rtpAudioSocket.setReuseAddress(true);
+                rtpAudioSocket.bind(new InetSocketAddress(RTP_AUDIO_PORT));
+                rtpAudioSocket.setReceiveBufferSize(512 * 1024);
                 byte[] buf = new byte[4096];
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                Log.i(TAG, "RTP audio socket bound to UDP port " + RTP_AUDIO_PORT);
+                long rxPackets = 0;
                 while (isRunning && !rtpAudioSocket.isClosed()) {
                     try {
+                        packet.setLength(buf.length);
                         rtpAudioSocket.receive(packet);
+                        rxPackets++;
+                        if (rxPackets == 1 || rxPackets % 500 == 0) {
+                            Log.i(TAG, "RTP audio packet RX count=" + rxPackets + " len=" + packet.getLength() + " from " + packet.getAddress());
+                        }
+                        audioPlayer.processRtpAudioPacket(packet.getData(), packet.getOffset(), packet.getLength());
                     } catch (Throwable ignored) {
                         if (!isRunning) break;
                     }
@@ -296,13 +334,26 @@ public class MangoAirPlayManager {
 
         threadPool.execute(() -> {
             try {
-                rtpControlSocket = new DatagramSocket(RTP_CONTROL_PORT);
+                if (rtpControlSocket != null && !rtpControlSocket.isClosed()) {
+                    rtpControlSocket.close();
+                }
+                rtpControlSocket = new DatagramSocket(null);
+                rtpControlSocket.setReuseAddress(true);
+                rtpControlSocket.bind(new InetSocketAddress(RTP_CONTROL_PORT));
                 rtpControlSocket.setReceiveBufferSize(64 * 1024);
                 byte[] buf = new byte[2048];
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                Log.i(TAG, "RTP control socket bound to UDP port " + RTP_CONTROL_PORT);
+                long ctrlPackets = 0;
                 while (isRunning && !rtpControlSocket.isClosed()) {
                     try {
+                        packet.setLength(buf.length);
                         rtpControlSocket.receive(packet);
+                        ctrlPackets++;
+                        if (ctrlPackets == 1 || ctrlPackets % 50 == 0) {
+                            int pt = (packet.getLength() > 1) ? (packet.getData()[packet.getOffset() + 1] & 0x7F) : -1;
+                            Log.i(TAG, "RTP control packet RX count=" + ctrlPackets + ", PT=" + pt);
+                        }
                     } catch (Throwable ignored) {
                         if (!isRunning) break;
                     }
@@ -311,6 +362,117 @@ public class MangoAirPlayManager {
                 if (isRunning) Log.w(TAG, "RTP control socket error", t);
             }
         });
+
+        threadPool.execute(() -> {
+            try {
+                if (rtpTimingSocket != null && !rtpTimingSocket.isClosed()) {
+                    rtpTimingSocket.close();
+                }
+                rtpTimingSocket = new DatagramSocket(null);
+                rtpTimingSocket.setReuseAddress(true);
+                rtpTimingSocket.bind(new InetSocketAddress(RTP_TIMING_PORT));
+                rtpTimingSocket.setReceiveBufferSize(64 * 1024);
+                byte[] buf = new byte[128];
+                DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                Log.i(TAG, "RTP timing socket bound to UDP port " + RTP_TIMING_PORT);
+                long timingCount = 0;
+                while (isRunning && !rtpTimingSocket.isClosed()) {
+                    try {
+                        packet.setLength(buf.length);
+                        rtpTimingSocket.receive(packet);
+                        timingCount++;
+                        if (timingCount == 1 || timingCount % 20 == 0) {
+                            Log.i(TAG, "RTP timing packet RX count=" + timingCount + " from " + packet.getAddress() + ":" + packet.getPort());
+                        }
+                        handleTimingPacket(packet);
+                    } catch (Throwable ignored) {
+                        if (!isRunning) break;
+                    }
+                }
+            } catch (Throwable t) {
+                if (isRunning) Log.w(TAG, "RTP timing socket error", t);
+            }
+        });
+    }
+
+    private void handleTimingPacket(DatagramPacket packet) {
+        int len = packet.getLength();
+        byte[] data = packet.getData();
+        if (len < 32 || data == null) return;
+
+        // PT 82 (Timing Query from client): (data[1] & 0x7F) == 82
+        int pt = data[1] & 0x7F;
+        if (pt == 82) {
+            long nowMillis = System.currentTimeMillis();
+            long ntpSecs = (nowMillis / 1000L) + 2208988800L;
+            long ntpFrac = ((nowMillis % 1000L) * 0x100000000L) / 1000L;
+            long ntpTimestamp = (ntpSecs << 32) | (ntpFrac & 0xFFFFFFFFL);
+
+            byte[] reply = new byte[32];
+            reply[0] = (byte) 0x80; // RTP v2
+            reply[1] = (byte) 0xD3; // Marker bit + PT 83 (0x80 | 83 = 0xD3)
+            reply[2] = data[2];     // Echo sequence number
+            reply[3] = data[3];
+            // 4 bytes timestamp/padding
+            reply[4] = 0; reply[5] = 0; reply[6] = 0; reply[7] = 0;
+
+            // Bytes 8-15: Originate timestamp (copy client's transmit timestamp from query bytes 24-31)
+            System.arraycopy(data, 24, reply, 8, 8);
+
+            // Bytes 16-23: Receive timestamp (server time when query arrived)
+            writeLongBE(reply, 16, ntpTimestamp);
+
+            // Bytes 24-31: Transmit timestamp (server time when reply leaves)
+            writeLongBE(reply, 24, ntpTimestamp);
+
+            try {
+                DatagramPacket replyPacket = new DatagramPacket(reply, reply.length, packet.getAddress(), packet.getPort());
+                if (rtpTimingSocket != null && !rtpTimingSocket.isClosed()) {
+                    rtpTimingSocket.send(replyPacket);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to send timing reply", t);
+            }
+        }
+    }
+
+    private void sendTimingQueryToClient(InetAddress clientAddr, int clientTimingPort) {
+        if (threadPool == null) return;
+        threadPool.execute(() -> {
+            try {
+                long nowMillis = System.currentTimeMillis();
+                long ntpSecs = (nowMillis / 1000L) + 2208988800L;
+                long ntpFrac = ((nowMillis % 1000L) * 0x100000000L) / 1000L;
+                long ntpTimestamp = (ntpSecs << 32) | (ntpFrac & 0xFFFFFFFFL);
+
+                byte[] query = new byte[32];
+                query[0] = (byte) 0x80; // RTP v2
+                query[1] = (byte) 0xD2; // Marker + PT 82 (0x80 | 82 = 0xD2)
+                query[2] = 0;           // Sequence number
+                query[3] = 1;
+                // Transmit timestamp at bytes 24-31
+                writeLongBE(query, 24, ntpTimestamp);
+
+                DatagramPacket qPacket = new DatagramPacket(query, query.length, clientAddr, clientTimingPort);
+                if (rtpTimingSocket != null && !rtpTimingSocket.isClosed()) {
+                    rtpTimingSocket.send(qPacket);
+                    Log.i(TAG, "Sent initial timing query to client " + clientAddr + ":" + clientTimingPort);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to send timing query to client", t);
+            }
+        });
+    }
+
+    private static void writeLongBE(byte[] b, int offset, long val) {
+        b[offset]     = (byte) ((val >> 56) & 0xFF);
+        b[offset + 1] = (byte) ((val >> 48) & 0xFF);
+        b[offset + 2] = (byte) ((val >> 40) & 0xFF);
+        b[offset + 3] = (byte) ((val >> 32) & 0xFF);
+        b[offset + 4] = (byte) ((val >> 24) & 0xFF);
+        b[offset + 5] = (byte) ((val >> 16) & 0xFF);
+        b[offset + 6] = (byte) ((val >> 8)  & 0xFF);
+        b[offset + 7] = (byte) (val & 0xFF);
     }
 
     private void stopUdpAudioSockets() {
@@ -322,9 +484,14 @@ public class MangoAirPlayManager {
             try { rtpControlSocket.close(); } catch (Throwable ignored) {}
             rtpControlSocket = null;
         }
+        if (rtpTimingSocket != null) {
+            try { rtpTimingSocket.close(); } catch (Throwable ignored) {}
+            rtpTimingSocket = null;
+        }
     }
 
     private void handleConnection(Socket socket) {
+        boolean isRtspAudioSession = false;
         try {
             socket.setSoTimeout(30000);
             InputStream in = new BufferedInputStream(socket.getInputStream(), 8192);
@@ -362,7 +529,17 @@ public class MangoAirPlayManager {
                 }
 
                 String userAgent = headers.get("user-agent");
-                String clientName = (userAgent != null) ? userAgent : "Apple Device";
+                String appleDeviceName = headers.get("x-apple-device-name");
+                String clientName;
+                if (appleDeviceName != null && !appleDeviceName.isEmpty()) {
+                    clientName = appleDeviceName;
+                } else if (userAgent != null && userAgent.toLowerCase(Locale.ROOT).contains("airplay")) {
+                    clientName = "iPhone";
+                } else if (userAgent != null) {
+                    clientName = userAgent;
+                } else {
+                    clientName = "Apple Device";
+                }
                 String clientIp = (socket.getInetAddress() != null) ? socket.getInetAddress().getHostAddress() : "unknown";
                 String cseq = headers.get("cseq");
 
@@ -373,7 +550,7 @@ public class MangoAirPlayManager {
                 if ("OPTIONS".equals(method)) {
                     handleOptions(out, protocol, cseq, headers, socket);
                 } else if ("GET".equals(method) && (uri.contains("/server-info") || uri.contains("/info"))) {
-                    handleServerInfo(out, protocol, cseq);
+                    handleServerInfo(out, protocol, cseq, uri);
                 } else if ("GET".equals(method) && uri.contains("/playback-info")) {
                     handlePlaybackInfo(out, protocol, cseq);
                 } else if (("POST".equals(method) || "PUT".equals(method)) && uri.startsWith("/photo")) {
@@ -393,18 +570,110 @@ public class MangoAirPlayManager {
                     sendGenericResponse(out, protocol, 404, "Not Found", cseq, null, null);
                 } else if ("POST".equals(method) && uri.startsWith("/reverse")) {
                     sendGenericResponse(out, protocol, 101, "Switching Protocols", cseq, null, null);
-                } else if ("SETUP".equals(method)) {
+                } else if ("ANNOUNCE".equals(method)) {
+                    isRtspAudioSession = true;
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
                     });
-                    int audioPort = (rtpAudioSocket != null && !rtpAudioSocket.isClosed()) ? rtpAudioSocket.getLocalPort() : RTP_AUDIO_PORT;
-                    int controlPort = (rtpControlSocket != null && !rtpControlSocket.isClosed()) ? rtpControlSocket.getLocalPort() : RTP_CONTROL_PORT;
+                    String sdp = "";
+                    if (contentLength > 0 && contentLength < 65536) {
+                        byte[] bodyBytes = readExactBytes(in, (int) contentLength);
+                        sdp = new String(bodyBytes, StandardCharsets.UTF_8);
+                        bodyHandled = true;
+                    }
+                    Log.i(TAG, "AirPlay ANNOUNCE SDP received:\n" + sdp);
+
+                    byte[] aesKey = null;
+                    byte[] aesIv = null;
+                    String fmtp = null;
+                    boolean isAlac = true;
+
+                    for (String line : sdp.split("\r?\n")) {
+                        line = line.trim();
+                        if (line.startsWith("a=rsaaeskey:")) {
+                            String b64Key = line.substring("a=rsaaeskey:".length()).trim();
+                            aesKey = decryptRsaKey(b64Key);
+                        } else if (line.startsWith("a=aesiv:")) {
+                            String b64Iv = line.substring("a=aesiv:".length()).trim();
+                            try {
+                                aesIv = android.util.Base64.decode(b64Iv, android.util.Base64.DEFAULT);
+                            } catch (Throwable t) {
+                                Log.w(TAG, "Failed to decode aesiv", t);
+                            }
+                        } else if (line.startsWith("a=fmtp:")) {
+                            fmtp = line.substring("a=fmtp:".length()).trim();
+                        } else if (line.startsWith("a=rtpmap:")) {
+                            String rtpmap = line.substring("a=rtpmap:".length()).trim();
+                            if (rtpmap.contains("AppleLossless")) {
+                                isAlac = true;
+                            } else if (rtpmap.contains("L16")) {
+                                isAlac = false;
+                            }
+                        }
+                    }
+
+                    audioPlayer.setSession(aesKey, aesIv, fmtp, isAlac);
+
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
                     StringBuilder respSb = new StringBuilder();
                     respSb.append(proto).append(" 200 OK\r\n");
                     respSb.append("Server: AirTunes/377.17.246\r\n");
                     if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
-                    respSb.append("Transport: RTP/AVP/UDP;unicast;interleaved=0-1;mode=record;server_port=").append(audioPort).append(";control_port=").append(controlPort).append(";timing_port=0\r\n");
+                    String challenge = headers.get("apple-challenge");
+                    if (challenge != null && !challenge.isEmpty()) {
+                        String appleResp = computeAppleResponse(challenge, socket);
+                        if (appleResp != null) respSb.append("Apple-Response: ").append(appleResp).append("\r\n");
+                    }
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                } else if ("SETUP".equals(method)) {
+                    isRtspAudioSession = true;
+                    mainHandler.post(() -> {
+                        if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
+                    });
+                    audioPlayer.initTrack();
+
+                    // Parse client transport ports
+                    int clientTimingPort = 0;
+                    int clientControlPort = 0;
+                    String transportHdr = headers.get("transport");
+                    if (transportHdr != null) {
+                        for (String param : transportHdr.split(";")) {
+                            String p = param.trim();
+                            if (p.startsWith("timing_port=")) {
+                                try {
+                                    clientTimingPort = Integer.parseInt(p.substring(12).trim());
+                                } catch (Throwable ignored) {}
+                            } else if (p.startsWith("control_port=")) {
+                                try {
+                                    clientControlPort = Integer.parseInt(p.substring(13).trim());
+                                } catch (Throwable ignored) {}
+                            }
+                        }
+                    }
+
+                    // Send initial timing query to client's timing port if specified
+                    if (clientTimingPort > 0 && socket.getInetAddress() != null) {
+                        sendTimingQueryToClient(socket.getInetAddress(), clientTimingPort);
+                    }
+
+                    int audioPort = (rtpAudioSocket != null && !rtpAudioSocket.isClosed()) ? rtpAudioSocket.getLocalPort() : RTP_AUDIO_PORT;
+                    int controlPort = (rtpControlSocket != null && !rtpControlSocket.isClosed()) ? rtpControlSocket.getLocalPort() : RTP_CONTROL_PORT;
+                    int timingPort = (rtpTimingSocket != null && !rtpTimingSocket.isClosed()) ? rtpTimingSocket.getLocalPort() : RTP_TIMING_PORT;
+
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Transport: RTP/AVP/UDP;unicast;interleaved=0-1;mode=record;server_port=")
+                          .append(audioPort)
+                          .append(";control_port=")
+                          .append(controlPort)
+                          .append(";timing_port=")
+                          .append(timingPort)
+                          .append("\r\n");
                     respSb.append("Session: 1\r\n");
                     respSb.append("Audio-Jack-Status: connected; type=analog\r\n");
                     String challenge = headers.get("apple-challenge");
@@ -416,11 +685,17 @@ public class MangoAirPlayManager {
                     out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 } else if ("RECORD".equals(method)) {
+                    isRtspAudioSession = true;
+                    audioPlayer.initTrack();
+                    mainHandler.post(() -> {
+                        if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName + " • Playing Audio");
+                    });
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
                     StringBuilder respSb = new StringBuilder();
                     respSb.append(proto).append(" 200 OK\r\n");
                     respSb.append("Server: AirTunes/377.17.246\r\n");
                     if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Session: 1\r\n");
                     respSb.append("Audio-Latency: 0\r\n");
                     String challenge = headers.get("apple-challenge");
                     if (challenge != null && !challenge.isEmpty()) {
@@ -432,32 +707,66 @@ public class MangoAirPlayManager {
                     out.flush();
                 } else if ("GET_PARAMETER".equals(method)) {
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Session: 1\r\n");
+                    respSb.append("Content-Type: text/parameters\r\n");
                     String body = "volume: 0.00\r\n";
-                    sendGenericResponse(out, proto, 200, "OK", cseq, "text/parameters", body);
-                } else if ("SET_PARAMETER".equals(method) || "FLUSH".equals(method)) {
-                    sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
-                } else if ("ANNOUNCE".equals(method)) {
+                    byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+                    respSb.append("Content-Length: ").append(bodyBytes.length).append("\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
+                    out.write(bodyBytes);
+                    out.flush();
+                } else if ("SET_PARAMETER".equals(method)) {
+                    if (contentLength > 0 && contentLength < 65536) {
+                        byte[] bodyBytes = readExactBytes(in, (int) contentLength);
+                        String param = new String(bodyBytes, StandardCharsets.UTF_8);
+                        bodyHandled = true;
+                        int idx = param.indexOf("volume:");
+                        if (idx >= 0) {
+                            try {
+                                float vol = Float.parseFloat(param.substring(idx + 7).trim());
+                                audioPlayer.setVolume(vol);
+                                Log.i(TAG, "AirPlay audio volume set: " + vol + " dB");
+                            } catch (Throwable ignored) {}
+                        }
+                    }
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Session: 1\r\n");
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                } else if ("FLUSH".equals(method)) {
+                    audioPlayer.flush();
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    StringBuilder respSb = new StringBuilder();
+                    respSb.append(proto).append(" 200 OK\r\n");
+                    respSb.append("Server: AirTunes/377.17.246\r\n");
+                    if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
+                    respSb.append("Session: 1\r\n");
+                    respSb.append("Content-Length: 0\r\n\r\n");
+                    out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                } else if ("TEARDOWN".equals(method)) {
+                    audioPlayer.stop();
                     mainHandler.post(() -> {
-                        if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
+                        if (listener != null) listener.onAirPlayStopped();
                     });
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
                     StringBuilder respSb = new StringBuilder();
                     respSb.append(proto).append(" 200 OK\r\n");
                     respSb.append("Server: AirTunes/377.17.246\r\n");
                     if (cseq != null) respSb.append("CSeq: ").append(cseq).append("\r\n");
-                    String challenge = headers.get("apple-challenge");
-                    if (challenge != null && !challenge.isEmpty()) {
-                        String appleResp = computeAppleResponse(challenge, socket);
-                        if (appleResp != null) respSb.append("Apple-Response: ").append(appleResp).append("\r\n");
-                    }
+                    respSb.append("Session: 1\r\n");
                     respSb.append("Content-Length: 0\r\n\r\n");
                     out.write(respSb.toString().getBytes(StandardCharsets.US_ASCII));
                     out.flush();
-                } else if ("TEARDOWN".equals(method)) {
-                    mainHandler.post(() -> {
-                        if (listener != null) listener.onAirPlayStopped();
-                    });
-                    sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
                     break;
                 } else {
                     sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
@@ -465,7 +774,7 @@ public class MangoAirPlayManager {
 
                 // Drain any unconsumed request body so subsequent requests on this keep-alive socket stay aligned
                 if (!bodyHandled && contentLength > 0 && contentLength < 35 * 1024 * 1024) {
-                    readExactBytes(in, (int) contentLength);
+                    drainBytes(in, contentLength);
                 }
             }
         } catch (Throwable t) {
@@ -474,6 +783,12 @@ public class MangoAirPlayManager {
             try {
                 socket.close();
             } catch (Throwable ignored) {}
+            if (isRtspAudioSession) {
+                audioPlayer.stop();
+                mainHandler.post(() -> {
+                    if (listener != null) listener.onAirPlayStopped();
+                });
+            }
         }
     }
 
@@ -483,8 +798,12 @@ public class MangoAirPlayManager {
         sb.append(proto).append(" 200 OK\r\n");
         sb.append("Server: AirTunes/377.17.246\r\n");
         if (cseq != null) sb.append("CSeq: ").append(cseq).append("\r\n");
-        sb.append("Public: ANNOUNCE, SETUP, RECORD, PAUSE, FLUSH, TEARDOWN, OPTIONS, GET_PARAMETER, SET_PARAMETER, POST, GET, PUT\r\n");
-        sb.append("Audio-Jack-Status: connected; type=analog\r\n");
+        if (proto.startsWith("RTSP")) {
+            sb.append("Public: ANNOUNCE, SETUP, RECORD, PAUSE, FLUSH, TEARDOWN, OPTIONS, GET_PARAMETER, SET_PARAMETER\r\n");
+            sb.append("Audio-Jack-Status: connected; type=analog\r\n");
+        } else {
+            sb.append("Public: GET, POST, PUT, DELETE, OPTIONS\r\n");
+        }
         String challenge = (headers != null) ? headers.get("apple-challenge") : null;
         if (challenge != null && !challenge.isEmpty()) {
             String appleResp = computeAppleResponse(challenge, socket);
@@ -583,24 +902,130 @@ public class MangoAirPlayManager {
         return new byte[] {(byte) 0xE2, 0x48, (byte) 0xCD, 0x2D, (byte) 0xCF, (byte) 0x9A};
     }
 
-    private void handleServerInfo(OutputStream out, String protocol, String cseq) throws IOException {
-        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n" +
-                "<plist version=\"1.0\">\n" +
-                "<dict>\n" +
-                "<key>deviceid</key>\n<string>" + hardwareMac + "</string>\n" +
-                "<key>features</key>\n<integer>9147</integer>\n" +
-                "<key>model</key>\n<string>AppleTV3,2</string>\n" +
-                "<key>name</key>\n<string>" + serverName + "</string>\n" +
-                "<key>protovers</key>\n<string>1.1</string>\n" +
-                "<key>srcvers</key>\n<string>377.17.246</string>\n" +
-                "<key>flags</key>\n<integer>0</integer>\n" +
-                "<key>acl</key>\n<integer>0</integer>\n" +
-                "<key>pi</key>\n<string>" + pairingId + "</string>\n" +
-                "<key>pk</key>\n<string>" + publicKey + "</string>\n" +
-                "<key>vv</key>\n<integer>2</integer>\n" +
-                "</dict>\n</plist>";
-        sendGenericResponse(out, protocol, 200, "OK", cseq, "text/x-apple-plist+xml", xml);
+    private void handleServerInfo(OutputStream out, String protocol, String cseq, String uri) throws IOException {
+        String txtAirPlayB64 = getTxtAirPlayB64();
+        String txtRaopB64 = getTxtRaopB64();
+
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+           .append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
+           .append("<plist version=\"1.0\">\n")
+           .append("<dict>\n")
+           .append("<key>deviceid</key>\n<string>").append(hardwareMac).append("</string>\n")
+           .append("<key>features</key>\n<integer>9147</integer>\n")
+           .append("<key>model</key>\n<string>AppleTV3,2</string>\n")
+           .append("<key>name</key>\n<string>").append(serverName).append("</string>\n")
+           .append("<key>protovers</key>\n<string>1.1</string>\n")
+           .append("<key>srcvers</key>\n<string>377.17.246</string>\n")
+           .append("<key>flags</key>\n<integer>0</integer>\n")
+           .append("<key>acl</key>\n<integer>0</integer>\n")
+           .append("<key>pi</key>\n<string>").append(pairingId).append("</string>\n")
+           .append("<key>pk</key>\n<string>").append(publicKey).append("</string>\n")
+           .append("<key>vv</key>\n<integer>2</integer>\n");
+
+        if (txtAirPlayB64 != null && !txtAirPlayB64.isEmpty()) {
+            xml.append("<key>txtAirPlay</key>\n<data>").append(txtAirPlayB64).append("</data>\n");
+        }
+        if (txtRaopB64 != null && !txtRaopB64.isEmpty()) {
+            xml.append("<key>txtRAOP</key>\n<data>").append(txtRaopB64).append("</data>\n");
+        }
+
+        xml.append("</dict>\n</plist>");
+        sendGenericResponse(out, protocol, 200, "OK", cseq, "text/x-apple-plist+xml", xml.toString());
+    }
+
+    private String getTxtAirPlayB64() {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("model", "AppleTV3,2");
+        map.put("features", "0x23BB,0x0");
+        map.put("srcvers", "377.17.246");
+        map.put("flags", "0x0");
+        map.put("protovers", "1.1");
+        map.put("acl", "0");
+        map.put("vv", "2");
+        map.put("deviceid", hardwareMac);
+        map.put("pi", pairingId);
+        map.put("pk", publicKey);
+        return encodeDnsSdTxt(map);
+    }
+
+    private String getTxtRaopB64() {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("txtvers", "1");
+        map.put("ch", "2");
+        map.put("cn", "0,1,2,3");
+        map.put("da", "true");
+        map.put("et", "0,1");
+        map.put("ft", "0x23BB,0x0");
+        map.put("sf", "0x0");
+        map.put("md", "0,1,2");
+        map.put("am", "AppleTV3,2");
+        map.put("pk", publicKey);
+        map.put("tp", "TCP,UDP");
+        map.put("vn", "65537");
+        map.put("vs", "377.17.246");
+        map.put("vv", "2");
+        map.put("sr", "44100");
+        map.put("ss", "16");
+        map.put("pw", "false");
+        return encodeDnsSdTxt(map);
+    }
+
+    private static String encodeDnsSdTxt(Map<String, String> map) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            for (Map.Entry<String, String> entry : map.entrySet()) {
+                String kv = entry.getKey() + "=" + entry.getValue();
+                byte[] b = kv.getBytes(StandardCharsets.UTF_8);
+                if (b.length > 0 && b.length <= 255) {
+                    baos.write(b.length);
+                    baos.write(b);
+                }
+            }
+            return android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP);
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private byte[] decryptRsaKey(String b64Key) {
+        if (rsaPrivateKey == null) {
+            Log.e(TAG, "rsaPrivateKey is null, cannot decrypt rsaaeskey");
+            return null;
+        }
+        try {
+            byte[] enc = android.util.Base64.decode(b64Key.trim(), android.util.Base64.DEFAULT);
+            // 1. Try RSA/ECB/OAEPWithSHA-1AndMGF1Padding
+            try {
+                Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
+                cipher.init(Cipher.DECRYPT_MODE, rsaPrivateKey);
+                byte[] dec = cipher.doFinal(enc);
+                if (dec != null && dec.length >= 16) {
+                    byte[] key = (dec.length == 16) ? dec : Arrays.copyOfRange(dec, dec.length - 16, dec.length);
+                    Log.i(TAG, "AirPlay AES key decrypted via RSA OAEP (" + key.length + " bytes)");
+                    return key;
+                }
+            } catch (Throwable t1) {
+                Log.d(TAG, "OAEP decryption failed, trying PKCS1: " + t1.getMessage());
+            }
+
+            // 2. Try RSA/ECB/PKCS1Padding fallback
+            try {
+                Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                cipher.init(Cipher.DECRYPT_MODE, rsaPrivateKey);
+                byte[] dec = cipher.doFinal(enc);
+                if (dec != null && dec.length >= 16) {
+                    byte[] key = (dec.length == 16) ? dec : Arrays.copyOfRange(dec, dec.length - 16, dec.length);
+                    Log.i(TAG, "AirPlay AES key decrypted via RSA PKCS1 (" + key.length + " bytes)");
+                    return key;
+                }
+            } catch (Throwable t2) {
+                Log.w(TAG, "PKCS1 decryption failed: " + t2.getMessage());
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "decryptRsaKey exception", t);
+        }
+        return null;
     }
 
     private void handlePlaybackInfo(OutputStream out, String protocol, String cseq) throws IOException {
@@ -643,9 +1068,12 @@ public class MangoAirPlayManager {
     }
 
     private void handlePhoto(InputStream in, OutputStream out, String protocol, String cseq, long contentLength, String clientIp, String clientName) throws IOException {
+        Log.i(TAG, "handlePhoto: contentLength=" + contentLength + " from " + clientIp);
         if (contentLength > 0 && contentLength < 35 * 1024 * 1024) { // Up to 35MB photo
             byte[] photoData = readExactBytes(in, (int) contentLength);
+            Log.i(TAG, "handlePhoto: read " + photoData.length + " bytes");
             Bitmap bitmap = BitmapFactory.decodeByteArray(photoData, 0, photoData.length);
+            Log.i(TAG, "handlePhoto: decoded bitmap=" + (bitmap != null ? bitmap.getWidth() + "x" + bitmap.getHeight() : "null"));
             if (bitmap != null) {
                 mainHandler.post(() -> {
                     if (listener != null) {
@@ -840,7 +1268,7 @@ public class MangoAirPlayManager {
             raopInfo.setAttribute("ch", "2");
             raopInfo.setAttribute("cn", "0,1,2,3");
             raopInfo.setAttribute("da", "true");
-            raopInfo.setAttribute("et", "0");
+            raopInfo.setAttribute("et", "0,1");
             raopInfo.setAttribute("ft", "0x23BB,0x0");
             raopInfo.setAttribute("sf", "0x0");
             raopInfo.setAttribute("md", "0,1,2");
@@ -1030,9 +1458,23 @@ public class MangoAirPlayManager {
         while ((b = in.read()) != -1) {
             if (b == '\n') break;
             if (b != '\r') baos.write(b);
+            if (baos.size() > 8192) {
+                throw new IOException("HTTP request line too long");
+            }
         }
         if (baos.size() == 0 && b == -1) return null;
         return baos.toString(StandardCharsets.UTF_8.name());
+    }
+
+    private static void drainBytes(InputStream in, long count) throws IOException {
+        byte[] drainBuf = new byte[8192];
+        long remaining = count;
+        while (remaining > 0) {
+            int toRead = (int) Math.min(drainBuf.length, remaining);
+            int r = in.read(drainBuf, 0, toRead);
+            if (r == -1) break;
+            remaining -= r;
+        }
     }
 
     private static byte[] readExactBytes(InputStream in, int count) throws IOException {

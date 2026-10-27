@@ -9,7 +9,7 @@
     android:background="@drawable/bg_airpods_card"
     android:clipChildren="false"
     android:clipToPadding="false"
-    android:elevation="25dp"
+    android:elevation="40dp"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:padding="16dp"

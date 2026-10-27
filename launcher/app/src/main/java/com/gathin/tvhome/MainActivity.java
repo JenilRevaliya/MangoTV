@@ -2844,6 +2844,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onBackPressed() {
+        if (airPlayVideoContainer != null && airPlayVideoContainer.getVisibility() == View.VISIBLE) {
+            stopAirPlayVideo();
+            dismissAirPlayHud();
+            return;
+        }
+        if (airPlayPhotoView != null && airPlayPhotoView.getVisibility() == View.VISIBLE) {
+            airPlayPhotoView.setVisibility(View.GONE);
+            dismissAirPlayHud();
+            return;
+        }
         // Home screen: Back goes nowhere.
     }
 
@@ -4793,21 +4803,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             mangoAirPlayManager.setListener(new MangoAirPlayManager.Listener() {
                 @Override
                 public void onAirPlayClientConnected(String clientIp, String deviceName) {
-                    if (connectivityCoordinator != null) {
-                        connectivityCoordinator.showStatusPill("AirPlay", deviceName + " connected", R.drawable.ic_airplay);
-                    } else {
-                        showAirPlayHud("Connected", deviceName);
-                    }
+                    runOnUiThread(() -> {
+                        boolean isPlaying = deviceName != null && (deviceName.contains("Playing") || deviceName.contains("Audio"));
+                        String cleanName = (deviceName != null) ? deviceName.replace(" • Playing Audio", "").replace(" • Playing", "").trim() : "iPhone";
+                        showAirPlayHud(isPlaying ? "Now Playing" : "Connected", cleanName);
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.showStatusPill("AirPlay", cleanName + (isPlaying ? " • Now Playing" : " connected"), R.drawable.ic_airplay);
+                        }
+                    });
                 }
 
                 @Override
                 public void onPhotoReceived(Bitmap photo) {
                     showAirPlayPhoto(photo);
+                    runOnUiThread(() -> showAirPlayHud("Displaying Photo", "iPhone"));
                 }
 
                 @Override
                 public void onVideoPlayRequested(String videoUrl, float startPosition) {
                     playAirPlayVideo(videoUrl, startPosition);
+                    runOnUiThread(() -> showAirPlayHud("Streaming Video", "iPhone"));
                 }
 
                 @Override
@@ -4816,8 +4831,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         if (airPlayVideoView != null && isAirPlayVideoPlaying) {
                             if (rate <= 0f) {
                                 airPlayVideoView.pause();
+                                showAirPlayHud("Paused", "iPhone");
                             } else {
                                 airPlayVideoView.start();
+                                showAirPlayHud("Playing", "iPhone");
                             }
                         }
                     });
@@ -4835,13 +4852,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 @Override
                 public void onAirPlayStopped() {
                     stopAirPlayVideo();
-                    if (connectivityCoordinator != null) {
-                        connectivityCoordinator.dismissDialog();
-                        connectivityCoordinator.dismissStatusPill();
-                    } else {
+                    runOnUiThread(() -> {
                         dismissAirPlayHud();
-                    }
-                    if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
+                        if (connectivityCoordinator != null) {
+                            connectivityCoordinator.dismissDialog();
+                            connectivityCoordinator.dismissStatusPill();
+                        }
+                        if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
+                    });
                 }
             });
             mangoAirPlayManager.start();
@@ -4863,7 +4881,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void showAirPlayHud(String status, String clientName) {
         if (airPlayHud == null) return;
-        if (airPlayHudTitle != null) airPlayHudTitle.setText("AirPlay • " + clientName);
+        airPlayHud.bringToFront();
+        if (airPlayHudTitle != null) {
+            airPlayHudTitle.setText("AirPlay • " + (clientName != null && !clientName.isEmpty() ? clientName : "Apple Device"));
+        }
         if (airPlayHudStatus != null) {
             airPlayHudStatus.setText(status);
             airPlayHudStatus.setTextColor(0xFF34C759);
@@ -4885,7 +4906,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             handler.removeCallbacks(airPlayAutoDismissRunnable);
         }
         airPlayAutoDismissRunnable = this::dismissAirPlayHud;
-        handler.postDelayed(airPlayAutoDismissRunnable, 6000L);
+        handler.postDelayed(airPlayAutoDismissRunnable, 8000L);
     }
 
     private void dismissAirPlayHud() {
@@ -4905,16 +4926,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void showAirPlayPhoto(Bitmap photo) {
+        Log.i("MainActivity", "showAirPlayPhoto: photo=" + (photo != null ? photo.getWidth() + "x" + photo.getHeight() : "null") + ", airPlayPhotoView=" + airPlayPhotoView);
         if (photo == null || airPlayPhotoView == null) return;
-        stopAirPlayVideo();
-        airPlayPhotoView.setImageBitmap(photo);
-        airPlayPhotoView.setVisibility(View.VISIBLE);
-        airPlayPhotoView.setAlpha(0f);
-        airPlayPhotoView.animate()
-                .alpha(1f)
-                .setDuration(300)
-                .start();
-        showAirPlayHud("Photo Cast", "AirPlay");
+        runOnUiThread(() -> {
+            stopAirPlayVideo();
+            airPlayPhotoView.setImageBitmap(photo);
+            airPlayPhotoView.setVisibility(View.VISIBLE);
+            airPlayPhotoView.setAlpha(1f);
+            airPlayPhotoView.bringToFront();
+            showAirPlayHud("Photo Cast", "AirPlay");
+        });
     }
 
     private void playAirPlayVideo(String videoUrl, float startPosition) {
@@ -4924,13 +4945,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 if (airPlayPhotoView != null) airPlayPhotoView.setVisibility(View.GONE);
                 if (airPlayVideoContainer != null) {
                     airPlayVideoContainer.setVisibility(View.VISIBLE);
-                    airPlayVideoContainer.setAlpha(0f);
-                    airPlayVideoContainer.animate().alpha(1f).setDuration(250).start();
+                    airPlayVideoContainer.setAlpha(1f);
+                    airPlayVideoContainer.bringToFront();
                 }
                 if (airPlayVideoProgress != null) airPlayVideoProgress.setVisibility(View.VISIBLE);
 
                 if (airPlayVideoView != null) {
-                    airPlayVideoView.stopPlayback();
+                    if (isAirPlayVideoPlaying) {
+                        try { airPlayVideoView.stopPlayback(); } catch (Throwable ignored) {}
+                    }
+                    isAirPlayVideoPlaying = false;
                     airPlayVideoView.setVideoPath(videoUrl);
                     airPlayVideoView.setOnPreparedListener(mp -> {
                         if (airPlayVideoProgress != null) airPlayVideoProgress.setVisibility(View.GONE);
@@ -4939,21 +4963,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                             airPlayVideoView.seekTo((int) (startPosition * 1000));
                         }
                         airPlayVideoView.start();
+                        Log.i("MainActivity", "AirPlay VideoView started playing: " + videoUrl);
                     });
                     airPlayVideoView.setOnCompletionListener(mp -> {
                         stopAirPlayVideo();
                     });
                     airPlayVideoView.setOnErrorListener((mp, what, extra) -> {
                         Log.w("MainActivity", "AirPlay VideoView playback error: " + what + ", " + extra);
-                        stopAirPlayVideo();
+                        if (what != -38) {
+                            stopAirPlayVideo();
+                        }
                         return true;
                     });
                 }
 
+                showAirPlayHud("Playing Video", "AirPlay");
                 if (connectivityCoordinator != null) {
                     connectivityCoordinator.showStatusPill("AirPlay", "Playing Video", R.drawable.ic_airplay);
-                } else {
-                    showAirPlayHud("Playing Stream", "AirPlay");
                 }
             } catch (Throwable t) {
                 Log.e("MainActivity", "Failed to play AirPlay video", t);

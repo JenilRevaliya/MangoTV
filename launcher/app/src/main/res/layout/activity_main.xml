@@ -460,6 +460,9 @@
     <!-- Mango TV Connectivity Top-Right Status Pill -->
     <include layout="@layout/view_connectivity_pill" />
 
+    <!-- Dedicated Floating AirPlay HUD -->
+    <include layout="@layout/view_airplay_hud" />
+
     <!-- Apple-inspired Premium Glass Settings Overlay -->
     <include layout="@layout/view_settings_overlay" />
 
