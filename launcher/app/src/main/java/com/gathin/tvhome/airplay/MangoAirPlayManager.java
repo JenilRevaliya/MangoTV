@@ -21,6 +21,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
@@ -74,11 +76,17 @@ public class MangoAirPlayManager {
     private Listener listener;
     private PlaybackInfoProvider playbackInfoProvider;
 
+    private static final int RTP_AUDIO_PORT = 6000;
+    private static final int RTP_CONTROL_PORT = 6001;
+
     private boolean isRunning = false;
     private ServerSocket serverSocket;
+    private DatagramSocket rtpAudioSocket;
+    private DatagramSocket rtpControlSocket;
     private ExecutorService threadPool;
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener airplayRegListener;
+    private NsdManager.RegistrationListener raopRegListener;
     private WifiManager.MulticastLock multicastLock;
     private BluetoothLeAdvertiser bleAdvertiser;
     private AdvertiseCallback bleAdvertiseCallback;
@@ -121,10 +129,13 @@ public class MangoAirPlayManager {
         // 2. Start TCP HTTP/RTSP Server
         startHttpServer();
 
-        // 3. Register mDNS / Bonjour Services
+        // 3. Start UDP RTP Audio and Control Sockets for RAOP
+        startUdpAudioSockets();
+
+        // 4. Register mDNS / Bonjour Services
         registerMdnsServices();
 
-        // 4. Start Apple Continuity BLE AirPlay Beacon
+        // 5. Start Apple Continuity BLE AirPlay Beacon
         startBleBeacon();
 
         Log.i(TAG, "Mango AirPlay active on port " + AIRPLAY_PORT + " with MAC " + hardwareMac);
@@ -136,6 +147,7 @@ public class MangoAirPlayManager {
 
         stopBleBeacon();
         unregisterMdnsServices();
+        stopUdpAudioSockets();
 
         if (multicastLock != null) {
             try {
@@ -181,6 +193,56 @@ public class MangoAirPlayManager {
                 }
             }
         });
+    }
+
+    private void startUdpAudioSockets() {
+        if (threadPool == null) return;
+        threadPool.execute(() -> {
+            try {
+                rtpAudioSocket = new DatagramSocket(RTP_AUDIO_PORT);
+                rtpAudioSocket.setReceiveBufferSize(256 * 1024);
+                byte[] buf = new byte[4096];
+                DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                while (isRunning && !rtpAudioSocket.isClosed()) {
+                    try {
+                        rtpAudioSocket.receive(packet);
+                    } catch (Throwable ignored) {
+                        if (!isRunning) break;
+                    }
+                }
+            } catch (Throwable t) {
+                if (isRunning) Log.w(TAG, "RTP audio socket error", t);
+            }
+        });
+
+        threadPool.execute(() -> {
+            try {
+                rtpControlSocket = new DatagramSocket(RTP_CONTROL_PORT);
+                rtpControlSocket.setReceiveBufferSize(64 * 1024);
+                byte[] buf = new byte[2048];
+                DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                while (isRunning && !rtpControlSocket.isClosed()) {
+                    try {
+                        rtpControlSocket.receive(packet);
+                    } catch (Throwable ignored) {
+                        if (!isRunning) break;
+                    }
+                }
+            } catch (Throwable t) {
+                if (isRunning) Log.w(TAG, "RTP control socket error", t);
+            }
+        });
+    }
+
+    private void stopUdpAudioSockets() {
+        if (rtpAudioSocket != null) {
+            try { rtpAudioSocket.close(); } catch (Throwable ignored) {}
+            rtpAudioSocket = null;
+        }
+        if (rtpControlSocket != null) {
+            try { rtpControlSocket.close(); } catch (Throwable ignored) {}
+            rtpControlSocket = null;
+        }
     }
 
     private void handleConnection(Socket socket) {
@@ -256,16 +318,13 @@ public class MangoAirPlayManager {
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
                     });
-                    String transportHeader = headers.get("transport");
-                    String transportResp = "RTP/AVP/UDP;unicast;mode=record;server_port=" + AIRPLAY_PORT;
-                    if (transportHeader != null && transportHeader.contains("control_port")) {
-                        transportResp = transportHeader;
-                    }
+                    int audioPort = (rtpAudioSocket != null && !rtpAudioSocket.isClosed()) ? rtpAudioSocket.getLocalPort() : RTP_AUDIO_PORT;
+                    int controlPort = (rtpControlSocket != null && !rtpControlSocket.isClosed()) ? rtpControlSocket.getLocalPort() : RTP_CONTROL_PORT;
                     String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
                     String resp = proto + " 200 OK\r\n" +
                             "Server: AirTunes/377.17.246\r\n" +
                             (cseq != null ? "CSeq: " + cseq + "\r\n" : "") +
-                            "Transport: " + transportResp + "\r\n" +
+                            "Transport: RTP/AVP/UDP;unicast;mode=record;server_port=" + audioPort + ";control_port=" + controlPort + ";timing_port=0\r\n" +
                             "Session: 1\r\n" +
                             "Audio-Jack-Status: connected\r\n" +
                             "Content-Length: 0\r\n\r\n";
@@ -280,6 +339,12 @@ public class MangoAirPlayManager {
                             "Content-Length: 0\r\n\r\n";
                     out.write(resp.getBytes(StandardCharsets.US_ASCII));
                     out.flush();
+                } else if ("GET_PARAMETER".equals(method)) {
+                    String proto = (protocol != null && protocol.startsWith("RTSP")) ? "RTSP/1.0" : "HTTP/1.1";
+                    String body = "volume: 0.00\r\n";
+                    sendGenericResponse(out, proto, 200, "OK", cseq, "text/parameters", body);
+                } else if ("SET_PARAMETER".equals(method) || "FLUSH".equals(method)) {
+                    sendGenericResponse(out, protocol, 200, "OK", cseq, null, null);
                 } else if ("ANNOUNCE".equals(method)) {
                     mainHandler.post(() -> {
                         if (listener != null) listener.onAirPlayClientConnected(clientIp, clientName);
@@ -564,6 +629,44 @@ public class MangoAirPlayManager {
                 @Override public void onServiceUnregistered(NsdServiceInfo serviceInfo) {}
             };
             nsdManager.registerService(airplayInfo, NsdManager.PROTOCOL_DNS_SD, airplayRegListener);
+
+            // 2. AirTunes / RAOP audio service (_raop._tcp)
+            // Required by iOS Control Center AirPlay audio picker
+            // Service name format: <MAC_NO_COLONS>@<ServerName>
+            NsdServiceInfo raopInfo = new NsdServiceInfo();
+            String raopName = hardwareMac.replace(":", "") + "@" + serverName;
+            raopInfo.setServiceName(raopName);
+            raopInfo.setServiceType("_raop._tcp");
+            raopInfo.setPort(AIRPLAY_PORT);
+            raopInfo.setAttribute("txtvers", "1");
+            raopInfo.setAttribute("ch", "2");
+            raopInfo.setAttribute("cn", "0,1,2,3");
+            raopInfo.setAttribute("da", "true");
+            raopInfo.setAttribute("et", "0");
+            raopInfo.setAttribute("ft", "0x23BB,0x0");
+            raopInfo.setAttribute("sf", "0x0");
+            raopInfo.setAttribute("md", "0,1,2");
+            raopInfo.setAttribute("am", "AppleTV3,2");
+            raopInfo.setAttribute("pk", publicKey);
+            raopInfo.setAttribute("tp", "TCP,UDP");
+            raopInfo.setAttribute("vn", "65537");
+            raopInfo.setAttribute("vs", "377.17.246");
+            raopInfo.setAttribute("vv", "2");
+            raopInfo.setAttribute("sr", "44100");
+            raopInfo.setAttribute("ss", "16");
+            raopInfo.setAttribute("pw", "false");
+
+            raopRegListener = new NsdManager.RegistrationListener() {
+                @Override public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
+                    Log.w(TAG, "RAOP mDNS registration failed: " + errorCode);
+                }
+                @Override public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {}
+                @Override public void onServiceRegistered(NsdServiceInfo serviceInfo) {
+                    Log.i(TAG, "_raop._tcp registered as " + serviceInfo.getServiceName());
+                }
+                @Override public void onServiceUnregistered(NsdServiceInfo serviceInfo) {}
+            };
+            nsdManager.registerService(raopInfo, NsdManager.PROTOCOL_DNS_SD, raopRegListener);
         } catch (Throwable t) {
             Log.e(TAG, "Error registering AirPlay mDNS services", t);
         }
@@ -575,6 +678,12 @@ public class MangoAirPlayManager {
             if (airplayRegListener != null) {
                 nsdManager.unregisterService(airplayRegListener);
                 airplayRegListener = null;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if (raopRegListener != null) {
+                nsdManager.unregisterService(raopRegListener);
+                raopRegListener = null;
             }
         } catch (Throwable ignored) {}
     }
